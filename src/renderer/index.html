@@ -1,0 +1,55 @@
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'none'" />
+<title>Panel CEDEARs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<body>
+  <div class="app">
+    <nav class="rail">
+      <div class="rail-brand">
+        <span class="rail-brand-mark">CEDEARs</span>
+      </div>
+      <button class="rail-item is-active" data-vista="resumen">
+        <svg viewBox="0 0 24 24" width="18" height="18"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        <span>Resumen</span>
+      </button>
+      <button class="rail-item" data-vista="oportunidades">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 2 L14.5 9 L22 9.5 L16 14.5 L18 22 L12 17.5 L6 22 L8 14.5 L2 9.5 L9.5 9 Z"/></svg>
+        <span>Oportunidades</span>
+      </button>
+      <button class="rail-item" data-vista="cartera">
+        <svg viewBox="0 0 24 24" width="18" height="18"><rect x="2.5" y="7.5" width="19" height="13" rx="2"/><path d="M8.5 7.5V6a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v1.5" fill="none" stroke-width="1.8"/></svg>
+        <span>Cartera</span>
+      </button>
+      <button class="rail-item" data-vista="simulador">
+        <svg viewBox="0 0 24 24" width="18" height="18"><rect x="4" y="2.5" width="16" height="19" rx="2" fill="none" stroke-width="1.6"/><path d="M8 7h8M8 11h2.2M13 11h2.8M8 15h2.2M13 15h2.8M8 19h2.2" stroke-width="1.6"/></svg>
+        <span>Simulador</span>
+      </button>
+      <button class="rail-item" data-vista="universo">
+        <svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="9" fill="none" stroke-width="1.6"/><path d="M3 12h18M12 3c2.5 2.5 3.8 5.8 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.8-3.8-9s1.3-6.5 3.8-9Z" fill="none" stroke-width="1.6"/></svg>
+        <span>Universo</span>
+      </button>
+      <button class="rail-item" data-vista="config">
+        <svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2.5 12h3M18.5 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" stroke-width="1.8" fill="none"/></svg>
+        <span>Configuración</span>
+      </button>
+      <div class="rail-status">
+        <button class="btn-refresh" id="btn-refresh">
+          <span id="refresh-label">Refrescar</span>
+        </button>
+        <div class="rail-updated" id="rail-updated"></div>
+        <div class="progress-track" id="progress-track" hidden>
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <div class="progress-label" id="progress-label"></div>
+      </div>
+    </nav>
+    <main class="content" id="view-container"></main>
+  </div>
+  <div class="modal-overlay" id="modal-overlay" hidden>
+    <div class="modal-panel" id="modal-panel" role="dialog" aria-modal="true"></div>
+  </div>
+  <script type="module" src="js/app.js"></script>
+</body>
