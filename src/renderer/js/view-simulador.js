@@ -1,5 +1,6 @@
 import { ars, num, pct, signClass, esc, limpiarTickerBare } from './format.js';
 import { renderGlosario } from './glosario.js';
+import { t } from './i18n.js';
 
 let perfil = 'AGRESIVO';
 let presupuesto = 1000000;
@@ -25,7 +26,7 @@ function filaCandidato(c, esManual) {
       <input type="checkbox" data-action="toggle-ticker" data-ticker="${esc(c.ticker)}" ${checked} />
       <span class="mono">${esc(c.ticker)}</span>
       <span class="check-nombre">${esc(c.nombre)}</span>
-      ${esManual ? `<button type="button" class="icon-btn" data-action="quitar-candidato" data-ticker="${esc(c.ticker)}" title="Sacar de la lista">✕</button>` : ''}
+      ${esManual ? `<button type="button" class="icon-btn" data-action="quitar-candidato" data-ticker="${esc(c.ticker)}" title="${t('simulador.sacarDeLaLista')}">✕</button>` : ''}
     </label>`;
 }
 
@@ -54,14 +55,14 @@ function asignarPresupuesto(candidatos, presupuesto) {
   const ordenados = [...conPrecio].sort((a, b) => b.calidad - a.calidad);
 
   const incluidos = [];
-  const excluidos = sinPrecio.map((c) => ({ ...c, motivo: 'no tiene precio actual disponible' }));
+  const excluidos = sinPrecio.map((c) => ({ ...c, motivo: t('simulador.motivoSinPrecio') }));
   let costoBase = 0;
   for (const c of ordenados) {
     if (costoBase + c.precioARS <= presupuesto) {
       incluidos.push(c);
       costoBase += c.precioARS;
     } else {
-      excluidos.push({ ...c, motivo: `no entra ni 1 unidad (${ars(c.precioARS)}) con lo que queda del presupuesto` });
+      excluidos.push({ ...c, motivo: t('simulador.motivoNoEntra', { precio: ars(c.precioARS) }) });
     }
   }
 
@@ -113,36 +114,36 @@ function calcularResumenRendimiento(filas, presupuestoTotal, config) {
 
 function renderResumenRendimiento(r) {
   return `
-    <h2 style="margin-top:2px">Rendimiento esperado a 12 meses (estimado)</h2>
-    <p class="hint" style="margin-top:-6px">Basado en el precio objetivo promedio de los analistas de cada ticker. Es una proyección de consenso, no una garantía — el mercado puede no cumplirla.</p>
+    <h2 style="margin-top:2px">${t('simulador.rendimientoTitulo')}</h2>
+    <p class="hint" style="margin-top:-6px">${t('simulador.rendimientoHint')}</p>
     <div class="kpi-grid">
       <div class="kpi">
-        <div class="kpi-label">Potencial ponderado</div>
+        <div class="kpi-label">${t('simulador.potencialPonderado')}</div>
         <div class="kpi-value">${pct(r.potencialPonderado)}</div>
       </div>
       <div class="kpi">
-        <div class="kpi-label">Valor estimado a 12 meses</div>
+        <div class="kpi-label">${t('simulador.valorEstimado12m')}</div>
         <div class="kpi-value">${ars(r.valorEstimado12m)}</div>
       </div>
       <div class="kpi ${signClass(r.gananciaEstimada)}">
-        <div class="kpi-label">Ganancia estimada</div>
+        <div class="kpi-label">${t('simulador.gananciaEstimada')}</div>
         <div class="kpi-value">${ars(r.gananciaEstimada)}</div>
       </div>
       <div class="kpi ${signClass(r.diferenciaPFTradicional)}">
-        <div class="kpi-label">Vs. plazo fijo tradicional</div>
+        <div class="kpi-label">${t('common.vsPfTradicional')}</div>
         <div class="kpi-value">${ars(r.diferenciaPFTradicional)}</div>
-        <div class="kpi-sub">${r.diferenciaPFTradicional >= 0 ? 'le ganaría al plazo fijo' : 'perdería contra el plazo fijo'}</div>
+        <div class="kpi-sub">${r.diferenciaPFTradicional >= 0 ? t('simulador.leGanariaPf') : t('simulador.perderiaPf')}</div>
       </div>
       <div class="kpi ${signClass(r.diferenciaPFUva)}">
-        <div class="kpi-label">Vs. plazo fijo UVA</div>
+        <div class="kpi-label">${t('common.vsPfUva')}</div>
         <div class="kpi-value">${ars(r.diferenciaPFUva)}</div>
-        <div class="kpi-sub">con inflación estimada default, no la real</div>
+        <div class="kpi-sub">${t('simulador.inflacionEstimadaDefault')}</div>
       </div>
     </div>
     <div class="mini-stats">
-      <span>Calidad promedio ponderada: <strong>${r.calidadPonderada.toFixed(0)}</strong></span>
-      <span>Timing promedio ponderado: <strong>${r.timingPonderado.toFixed(0)}</strong></span>
-      <span>Sectores distintos: <strong>${r.sectores}</strong></span>
+      <span>${t('simulador.calidadPromedioPonderada')}: <strong>${r.calidadPonderada.toFixed(0)}</strong></span>
+      <span>${t('simulador.timingPromedioPonderado')}: <strong>${r.timingPonderado.toFixed(0)}</strong></span>
+      <span>${t('simulador.sectoresDistintos')}: <strong>${r.sectores}</strong></span>
     </div>`;
 }
 
@@ -163,45 +164,45 @@ export function renderSimulador(container, s) {
 
   if (!snap) {
     container.innerHTML = `
-      <div class="view-header"><div><h1>Simulador de cartera</h1></div></div>
-      <p class="empty-inline">Todavía no hay datos del universo de CEDEARs. Esperá al primer refresco.</p>`;
+      <div class="view-header"><div><h1>${t('simulador.titulo')}</h1></div></div>
+      <p class="empty-inline">${t('simulador.esperandoPrimerRefresco')}</p>`;
     return;
   }
 
   container.innerHTML = `
     <div class="view-header">
       <div>
-        <h1>Simulador de cartera</h1>
-        <p class="view-subtitle">Metés un presupuesto y lo reparte entre las oportunidades del perfil elegido, según el score de Calidad de cada una dentro del grupo. Es una simulación: no toca tu cartera real.</p>
+        <h1>${t('simulador.titulo')}</h1>
+        <p class="view-subtitle">${t('simulador.subtitulo')}</p>
       </div>
     </div>
 
     <div class="sim-controls panel">
       <div class="field-grid">
-        <label>Perfil
+        <label>${t('simulador.perfil')}
           <select id="sim-perfil">
-            <option value="AGRESIVO" ${perfil === 'AGRESIVO' ? 'selected' : ''}>Agresivo</option>
-            <option value="CONSERVADOR" ${perfil === 'CONSERVADOR' ? 'selected' : ''}>Conservador</option>
+            <option value="AGRESIVO" ${perfil === 'AGRESIVO' ? 'selected' : ''}>${t('common.agresivo')}</option>
+            <option value="CONSERVADOR" ${perfil === 'CONSERVADOR' ? 'selected' : ''}>${t('common.conservador')}</option>
           </select>
         </label>
-        <label>Presupuesto total (ARS)
+        <label>${t('simulador.presupuestoTotal')}
           <input type="number" id="sim-presupuesto" value="${presupuesto}" step="1000" min="0" />
         </label>
       </div>
 
-      <h2 style="margin-top:18px">Candidatos (${listaCompleta.length})</h2>
+      <h2 style="margin-top:18px">${t('simulador.candidatos', { n: listaCompleta.length })}</h2>
       ${listaCompleta.length === 0
-        ? `<p class="empty-inline">No hay tickers en "⭐ Comprar ahora" para este perfil hoy. Agregá alguno a mano abajo, o probá con el otro perfil.</p>`
+        ? `<p class="empty-inline">${t('simulador.sinCandidatos')}</p>`
         : `<div class="check-list">${candidatosBase.map((c) => filaCandidato(c, false)).join('')}${manuales.map((c) => filaCandidato(c, true)).join('')}</div>`}
 
       <form class="inline-form" id="form-agregar-manual" style="margin-top:12px">
-        <input type="text" name="ticker" placeholder="Agregar ticker a mano (ej: AAPL)" style="text-transform:uppercase" list="tickers-universo" />
+        <input type="text" name="ticker" placeholder="${t('simulador.agregarAMano')}" style="text-transform:uppercase" list="tickers-universo" />
         <datalist id="tickers-universo">${universoDatos.map((d) => `<option value="${esc(d.ticker)}"></option>`).join('')}</datalist>
-        <button type="submit" class="btn-secondary">+ Agregar</button>
+        <button type="submit" class="btn-secondary">${t('universo.agregar')}</button>
       </form>
 
       <div class="form-actions" style="margin-top:16px">
-        <button type="button" id="btn-generar" class="btn-primary" ${calculando ? 'disabled' : ''}>${calculando ? 'Calculando…' : 'Generar cartera sugerida'}</button>
+        <button type="button" id="btn-generar" class="btn-primary" ${calculando ? 'disabled' : ''}>${calculando ? t('simulador.calculando') : t('simulador.generarCartera')}</button>
         ${error ? `<span class="save-status" style="color:var(--loss)">${esc(error)}</span>` : ''}
       </div>
     </div>
@@ -213,7 +214,7 @@ export function renderSimulador(container, s) {
   if (resultado) {
     const avisos = [];
     if (resultado.noEncontrados.length) {
-      avisos.push(`No se encontró dato reciente para: ${resultado.noEncontrados.map(esc).join(', ')}. Probá refrescar la app primero.`);
+      avisos.push(t('simulador.noEncontrados', { tickers: resultado.noEncontrados.map(esc).join(', ') }));
     }
 
     if (resultado.resultado.length === 0) {
@@ -222,27 +223,27 @@ export function renderSimulador(container, s) {
       const { filas, excluidos } = asignarPresupuesto(resultado.resultado, presupuesto);
 
       if (excluidos.length) {
-        avisos.push(`No entran con este presupuesto (no les alcanza ni para 1 unidad): ${excluidos.map((e) => `${esc(e.ticker)} — ${esc(e.motivo)}`).join('; ')}.`);
+        avisos.push(t('simulador.noEntranPresupuesto', { detalle: excluidos.map((e) => `${esc(e.ticker)} — ${esc(e.motivo)}`).join('; ') }));
       }
 
       resultadoDiv.innerHTML = avisos.map((a) => `<div class="banner banner-warn">${a}</div>`).join('');
 
       if (filas.length === 0) {
-        resultadoDiv.innerHTML += `<p class="empty-inline">Con este presupuesto no te alcanza para comprar ni 1 unidad de ninguno de los tickers elegidos. Subí el presupuesto o sacá los más caros de la selección.</p>`;
+        resultadoDiv.innerHTML += `<p class="empty-inline">${t('simulador.noAlcanzaNiUno')}</p>`;
       } else {
         if (s.config) {
           resultadoDiv.innerHTML += renderResumenRendimiento(calcularResumenRendimiento(filas, presupuesto, s.config));
         }
         resultadoDiv.innerHTML += `
-          <h2 style="margin-top:22px">Detalle por ticker</h2>
+          <h2 style="margin-top:22px">${t('simulador.detallePorTicker')}</h2>
           <div class="table-scroll">
             <table class="mov-table">
-              <thead><tr><th>Ticker</th><th>Empresa</th><th>Calidad</th><th>% cartera</th><th>Monto</th><th>Precio actual</th><th>Cantidad</th></tr></thead>
+              <thead><tr><th>${t('universo.ticker')}</th><th>${t('simulador.empresa')}</th><th>${t('common.calidad')}</th><th>${t('simulador.pctCartera')}</th><th>${t('cartera.monto')}</th><th>${t('simulador.precioActual')}</th><th>${t('simulador.cantidad')}</th></tr></thead>
               <tbody>${filas.map(filaResultado).join('')}</tbody>
-              <tfoot><tr class="fila-total"><td colspan="3">TOTAL</td><td class="num">100%</td><td class="num">${ars(presupuesto)}</td><td colspan="2"></td></tr></tfoot>
+              <tfoot><tr class="fila-total"><td colspan="3">${t('cartera.total')}</td><td class="num">100%</td><td class="num">${ars(presupuesto)}</td><td colspan="2"></td></tr></tfoot>
             </table>
           </div>
-          <p class="hint">A cada ticker incluido se le reserva primero la plata de 1 unidad al precio actual; el resto del presupuesto se reparte a prorrata de Calidad. Por eso "Cantidad" nunca da 0 para los que quedaron en la tabla.</p>`;
+          <p class="hint">${t('simulador.hintCantidad')}</p>`;
       }
     }
   }
@@ -279,7 +280,7 @@ export function renderSimulador(container, s) {
     const ticker = limpiarTickerBare(fd.get('ticker'));
     if (!ticker) return;
     if (!universoDatos.some((d) => d.ticker === ticker)) {
-      error = `${ticker} no tiene datos recientes en el último refresco.`;
+      error = t('simulador.errorSinDatos', { ticker });
       renderSimulador(container, s);
       return;
     }
@@ -290,12 +291,12 @@ export function renderSimulador(container, s) {
 
   container.querySelector('#btn-generar').addEventListener('click', async () => {
     if (seleccionados.size === 0) {
-      error = 'Elegí al menos un ticker.';
+      error = t('simulador.elegiUnTicker');
       renderSimulador(container, s);
       return;
     }
     if (presupuesto <= 0) {
-      error = 'El presupuesto tiene que ser mayor a cero.';
+      error = t('simulador.presupuestoMayorCero');
       renderSimulador(container, s);
       return;
     }
@@ -305,7 +306,7 @@ export function renderSimulador(container, s) {
     try {
       resultado = await window.api.simularCartera({ perfil, tickers: [...seleccionados] });
     } catch (e) {
-      error = 'No se pudo calcular: ' + e.message;
+      error = t('simulador.noSePudoCalcular', { mensaje: e.message });
     } finally {
       calculando = false;
       renderSimulador(container, s);

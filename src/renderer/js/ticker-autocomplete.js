@@ -1,4 +1,5 @@
 import { esc } from './format.js';
+import { t } from './i18n.js';
 
 // Engancha un buscador en vivo de tickers (vía Yahoo Finance) a un <input> de
 // texto: mientras el usuario escribe, sugiere símbolos reales para evitar
@@ -69,7 +70,7 @@ export function attachTickerAutocomplete(inputEl, onSelect, { soloBue = false } 
       cerrar();
       return;
     }
-    mostrarMensaje('Buscando…');
+    mostrarMensaje(t('autocomplete.buscando'));
     debounceTimer = setTimeout(async () => {
       const crudos = await window.api.buscarTicker(q);
       // si el usuario ya siguió escribiendo/borró, esta respuesta llegó tarde: descartarla
@@ -85,10 +86,10 @@ export function attachTickerAutocomplete(inputEl, onSelect, { soloBue = false } 
         // Yahoo encontró algo, pero nada listado en Buenos Aires todavía —
         // pasa seguido con prefijos de 2-3 letras. No es que esté roto.
         resultados = [];
-        mostrarMensaje(`Nada en Buenos Aires todavía para "${q}" — seguí escribiendo (probá el nombre completo del ticker).`);
+        mostrarMensaje(t('autocomplete.nadaEnBue', { q }));
       } else {
         resultados = [];
-        mostrarMensaje(`Sin resultados para "${q}".`);
+        mostrarMensaje(t('autocomplete.sinResultados', { q }));
       }
     }, 300);
   });

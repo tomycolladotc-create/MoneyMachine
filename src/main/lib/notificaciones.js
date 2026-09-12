@@ -3,19 +3,23 @@
 // La idea es avisar en el momento en que algo CAMBIA, no en cada refresco
 // mientras la condición sigue igual (para no repetir el mismo aviso cada 15 min).
 
-const PALABRAS_DE_ALERTA = ['Stop Loss', 'Take Profit', 'MANTENER'];
+const { t, traducirRecomendacion, traducirPerfil } = require('./i18n');
 
-function esRecomendacionDeAlerta(recomendacion) {
-  return PALABRAS_DE_ALERTA.some((palabra) => recomendacion?.includes(palabra));
+// Códigos estables devueltos por portfolio.js (calcularRecomendacion) — ver
+// comentario sobre señalDeTiming en scoring.js.
+const CODIGOS_DE_ALERTA = new Set(['STOP_LOSS', 'TAKE_PROFIT_SELL', 'TAKE_PROFIT_HOLD']);
+
+function esRecomendacionDeAlerta(codigo) {
+  return CODIGOS_DE_ALERTA.has(codigo);
 }
 
-function formatearLista(items, max = 8) {
+function formatearLista(items, max = 8, idioma) {
   if (items.length <= max) return items.join(', ');
-  return `${items.slice(0, max).join(', ')} y ${items.length - max} más`;
+  return `${items.slice(0, max).join(', ')} ${t(idioma, 'notif.yMas', { n: items.length - max })}`;
 }
 
 // anterior/nuevo: snapshots completos (o null si es el primer refresco de la app).
-function detectarNovedades(anterior, nuevo) {
+function detectarNovedades(anterior, nuevo, idioma) {
   if (!anterior) return []; // primer refresco de la app: es la línea de base, no "noticias"
 
   const avisos = [];
@@ -28,21 +32,20 @@ function detectarNovedades(anterior, nuevo) {
     return esRecomendacionDeAlerta(p.recomendacion) && p.recomendacion !== antes;
   });
   if (alertasCartera.length > 0) {
-    const detalle = alertasCartera.map((p) => `${p.ticker.replace(/\.BA$/i, '')}: ${p.recomendacion}`);
+    const detalle = alertasCartera.map((p) => `${p.ticker.replace(/\.BA$/i, '')}: ${traducirRecomendacion(idioma, p.recomendacion)}`);
     avisos.push({
-      titulo: alertasCartera.length === 1 ? 'Tu cartera necesita atención' : `${alertasCartera.length} posiciones necesitan atención`,
-      cuerpo: formatearLista(detalle, 5),
+      titulo: alertasCartera.length === 1 ? t(idioma, 'notif.carteraAtencion') : t(idioma, 'notif.posicionesAtencion', { n: alertasCartera.length }),
+      cuerpo: formatearLista(detalle, 5, idioma),
     });
   }
 
-  const NOMBRE_PERFIL = { AGRESIVO: 'Agresivo', CONSERVADOR: 'Conservador' };
   for (const perfil of ['AGRESIVO', 'CONSERVADOR']) {
     const antes = new Set((anterior.oportunidades?.[perfil] || []).map((t) => t.ticker));
     const nuevos = (nuevo.oportunidades?.[perfil] || []).filter((t) => !antes.has(t.ticker));
     if (nuevos.length > 0) {
       avisos.push({
-        titulo: `Nueva${nuevos.length > 1 ? 's' : ''} oportunidad${nuevos.length > 1 ? 'es' : ''} — ${NOMBRE_PERFIL[perfil]}`,
-        cuerpo: formatearLista(nuevos.map((t) => t.ticker)),
+        titulo: t(idioma, 'notif.nuevaOportunidad', { n: nuevos.length, perfil: traducirPerfil(idioma, perfil) }),
+        cuerpo: formatearLista(nuevos.map((tk) => tk.ticker), 8, idioma),
       });
     }
   }

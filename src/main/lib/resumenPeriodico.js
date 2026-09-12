@@ -4,8 +4,7 @@
 // "contraseña de aplicación").
 
 const nodemailer = require('nodemailer');
-
-const NOMBRE_FRECUENCIA = { diario: 'diario', semanal: 'semanal', mensual: 'mensual' };
+const { t, traducirRecomendacion, traducirPerfil } = require('./i18n');
 
 function diasEntreFechas(fechaIniISO, fechaFinISO) {
   const a = new Date(fechaIniISO + 'T00:00:00Z').getTime();
@@ -58,62 +57,62 @@ function puntoHistorialEnFecha(historial, fechaISO) {
 
 // Compara el estado actual contra el del último envío para mostrar cuánto
 // cambió la ganancia desde la última vez que se mandó un resumen.
-function lineaEvolucionDesdeUltimoEnvio(t, historial, ultimoEnvioISO) {
+function lineaEvolucionDesdeUltimoEnvio(total, historial, ultimoEnvioISO, idioma) {
   if (!ultimoEnvioISO) return null;
   const puntoAnterior = puntoHistorialEnFecha(historial, ultimoEnvioISO);
   if (!puntoAnterior) return null;
-  const delta = t.gananciaCedear - puntoAnterior.gananciaCedear;
+  const delta = total.gananciaCedear - puntoAnterior.gananciaCedear;
   if (Math.abs(delta) < 1) return null;
-  return `📊 Desde tu último resumen (${ultimoEnvioISO}): ${signo(delta)}${formatARS(delta)}`;
+  return t(idioma, 'resumen.evolucionDesdeUltimo', { fecha: ultimoEnvioISO, valor: `${signo(delta)}${formatARS(delta)}` });
 }
 
 // Diagnóstico breve en criollo: si vamos bien, y si no, qué mirar. Son
 // observaciones automáticas sobre datos que ya calculó la app (lo mismo que
 // ya se ve en Cartera/Resumen) — no es asesoramiento financiero personalizado.
-function generarDiagnostico(snapshot) {
-  const t = snapshot?.cartera?.total;
+function generarDiagnostico(snapshot, idioma) {
+  const total = snapshot?.cartera?.total;
   const posiciones = (snapshot?.cartera?.posiciones || []).filter((p) => p.posicionAbierta);
-  if (!t || t.capitalInvertido === 0 || posiciones.length === 0) return null;
+  if (!total || total.capitalInvertido === 0 || posiciones.length === 0) return null;
 
-  const comparaciones = [t.diferenciaPF, t.diferenciaPFUva, t.diferenciaBenchmark].filter((v) => v != null);
+  const comparaciones = [total.diferenciaPF, total.diferenciaPFUva, total.diferenciaBenchmark].filter((v) => v != null);
   const leGanaATodas = comparaciones.length > 0 && comparaciones.every((v) => v >= 0);
   const lePierdeATodas = comparaciones.length > 0 && comparaciones.every((v) => v < 0);
-  const gananciaPositiva = t.gananciaCedear >= 0;
+  const gananciaPositiva = total.gananciaCedear >= 0;
 
   const lineas = [];
 
   if (gananciaPositiva && leGanaATodas) {
-    lineas.push('🟢 Vas por buen camino: tu cartera está en ganancia y le está ganando a todas las alternativas con las que se compara (plazo fijo y el mercado americano).');
+    lineas.push(t(idioma, 'resumen.diagVaBien'));
   } else if (gananciaPositiva) {
-    lineas.push('🟡 Vas ganando plata en general, pero no le estás ganando a todas las alternativas — mirá el detalle de "vs." de arriba para ver contra cuál te está costando más.');
+    lineas.push(t(idioma, 'resumen.diagGanandoParcial'));
   } else if (lePierdeATodas) {
-    lineas.push('🔴 Tu cartera está en pérdida y por ahora rinde peor que todas las alternativas de comparación.');
+    lineas.push(t(idioma, 'resumen.diagPerdiendoTodas'));
   } else {
-    lineas.push('🔴 Tu cartera está en pérdida por ahora.');
+    lineas.push(t(idioma, 'resumen.diagPerdiendo'));
   }
 
-  const enStopLoss = posiciones.filter((p) => p.recomendacion.includes('Stop Loss'));
+  const enStopLoss = posiciones.filter((p) => p.recomendacion === 'STOP_LOSS');
   if (enStopLoss.length > 0) {
-    lineas.push(`⚠️ Recomendación: ${enStopLoss.map((p) => nombreTicker(p.ticker)).join(', ')} está${enStopLoss.length > 1 ? 'n' : ''} en zona de Stop Loss — vale la pena revisar${enStopLoss.length > 1 ? 'los' : 'lo'} con atención.`);
+    lineas.push(t(idioma, 'resumen.diagStopLoss', { tickers: enStopLoss.map((p) => nombreTicker(p.ticker)).join(', '), plural: enStopLoss.length > 1 }));
   }
 
-  const conTakeProfit = posiciones.filter((p) => p.recomendacion.includes('MANTENER') || p.recomendacion.includes('Take Profit'));
+  const conTakeProfit = posiciones.filter((p) => p.recomendacion === 'TAKE_PROFIT_HOLD' || p.recomendacion === 'TAKE_PROFIT_SELL');
   if (conTakeProfit.length > 0) {
-    lineas.push(`💎 ${conTakeProfit.map((p) => nombreTicker(p.ticker)).join(', ')} ya superó tu umbral de Take Profit — podrías evaluar asegurar parte de esa ganancia.`);
+    lineas.push(t(idioma, 'resumen.diagTakeProfit', { tickers: conTakeProfit.map((p) => nombreTicker(p.ticker)).join(', ') }));
   }
 
   if (posiciones.length === 1) {
-    lineas.push('⚠️ Toda la cartera está en un solo ticker — diversificar en más empresas reduce el riesgo de que un mal día de una sola te pegue fuerte a todo el capital.');
+    lineas.push(t(idioma, 'resumen.diagUnSoloTicker'));
   } else {
     const mayor = posiciones.reduce((max, p) => (p.valorHoyTotal > (max?.valorHoyTotal ?? -1) ? p : max), null);
-    const concentracionPct = t.valorHoyTotal ? (mayor.valorHoyTotal / t.valorHoyTotal) * 100 : 0;
+    const concentracionPct = total.valorHoyTotal ? (mayor.valorHoyTotal / total.valorHoyTotal) * 100 : 0;
     if (concentracionPct >= 50) {
-      lineas.push(`⚠️ ${nombreTicker(mayor.ticker)} concentra ${concentracionPct.toFixed(0)}% del valor de tu cartera — podría convenir diversificar un poco más para no depender tanto de una sola empresa.`);
+      lineas.push(t(idioma, 'resumen.diagConcentracion', { ticker: nombreTicker(mayor.ticker), pct: concentracionPct.toFixed(0) }));
     }
   }
 
   if (lineas.length === 1 && gananciaPositiva && leGanaATodas) {
-    lineas.push('No hay ninguna alerta puntual por ahora — seguí como venís.');
+    lineas.push(t(idioma, 'resumen.diagSinAlertas'));
   }
 
   return lineas.join('\n');
@@ -121,50 +120,50 @@ function generarDiagnostico(snapshot) {
 
 // snapshot: el snapshot completo de la app. frecuencia: para el título del
 // mensaje. historial/ultimoEnvioISO (opcionales): para mostrar cuánto cambió
-// desde el resumen anterior.
-function construirResumenTexto(snapshot, frecuencia, historial, ultimoEnvioISO) {
-  const t = snapshot?.cartera?.total;
+// desde el resumen anterior. idioma: 'es' | 'en'.
+function construirResumenTexto(snapshot, frecuencia, historial, ultimoEnvioISO, idioma) {
+  const total = snapshot?.cartera?.total;
   const posiciones = snapshot?.cartera?.posiciones || [];
   const fecha = snapshot?.fecha || '';
-  const etiqueta = NOMBRE_FRECUENCIA[frecuencia] || frecuencia;
+  const etiqueta = t(idioma, `frecuencia.${frecuencia}`) || frecuencia;
 
-  if (!t || t.capitalInvertido === 0) {
-    return `📊 Panel CEDEARs — resumen ${etiqueta} (${fecha})\n\nTodavía no tenés movimientos cargados en tu cartera.`;
+  if (!total || total.capitalInvertido === 0) {
+    return `${t(idioma, 'resumen.encabezado', { etiqueta, fecha })}\n\n${t(idioma, 'resumen.sinMovimientos')}`;
   }
 
-  const gananciaPct = t.capitalInvertido ? (t.gananciaCedear / t.capitalInvertido) * 100 : 0;
+  const gananciaPct = total.capitalInvertido ? (total.gananciaCedear / total.capitalInvertido) * 100 : 0;
   const lineas = [
-    `📊 Panel CEDEARs — resumen ${etiqueta} (${fecha})`,
+    t(idioma, 'resumen.encabezado', { etiqueta, fecha }),
     '',
-    `💰 Invertido: ${formatARS(t.capitalInvertido)}`,
-    `📈 Valor hoy: ${formatARS(t.valorHoyTotal)}`,
-    `${t.gananciaCedear >= 0 ? '✅' : '🔻'} Ganancia: ${formatARS(t.gananciaCedear)} (${signo(gananciaPct)}${gananciaPct.toFixed(1)}%)`,
+    `💰 ${t(idioma, 'resumen.invertido')}: ${formatARS(total.capitalInvertido)}`,
+    `📈 ${t(idioma, 'resumen.valorHoy')}: ${formatARS(total.valorHoyTotal)}`,
+    `${total.gananciaCedear >= 0 ? '✅' : '🔻'} ${t(idioma, 'resumen.ganancia')}: ${formatARS(total.gananciaCedear)} (${signo(gananciaPct)}${gananciaPct.toFixed(1)}%)`,
   ];
 
-  const lineaEvolucion = lineaEvolucionDesdeUltimoEnvio(t, historial, ultimoEnvioISO);
+  const lineaEvolucion = lineaEvolucionDesdeUltimoEnvio(total, historial, ultimoEnvioISO, idioma);
   if (lineaEvolucion) lineas.push(lineaEvolucion);
 
   lineas.push('');
-  lineas.push(`vs. Plazo fijo: ${signo(t.diferenciaPF)}${formatARS(t.diferenciaPF)}`);
-  lineas.push(`vs. Plazo fijo UVA: ${signo(t.diferenciaPFUva)}${formatARS(t.diferenciaPFUva)}`);
-  if (t.diferenciaBenchmark != null) {
-    lineas.push(`vs. S&P 500: ${signo(t.diferenciaBenchmark)}${formatARS(t.diferenciaBenchmark)}`);
+  lineas.push(`${t(idioma, 'resumen.vsPf')}: ${signo(total.diferenciaPF)}${formatARS(total.diferenciaPF)}`);
+  lineas.push(`${t(idioma, 'resumen.vsPfUva')}: ${signo(total.diferenciaPFUva)}${formatARS(total.diferenciaPFUva)}`);
+  if (total.diferenciaBenchmark != null) {
+    lineas.push(`${t(idioma, 'resumen.vsSp500')}: ${signo(total.diferenciaBenchmark)}${formatARS(total.diferenciaBenchmark)}`);
   }
 
   const posicionesAbiertas = posiciones.filter((p) => p.posicionAbierta);
   if (posicionesAbiertas.length > 0) {
     lineas.push('');
-    lineas.push('📋 Cómo vienen tus posiciones:');
+    lineas.push(t(idioma, 'resumen.comoVienenPosiciones'));
     for (const p of posicionesAbiertas.sort((a, b) => b.gananciaCedear - a.gananciaCedear)) {
       const pct = p.capitalInvertido ? (p.gananciaCedear / p.capitalInvertido) * 100 : 0;
-      lineas.push(`${nombreTicker(p.ticker)}: ${signo(p.gananciaCedear)}${formatARS(p.gananciaCedear)} (${signo(pct)}${pct.toFixed(1)}%) — ${p.recomendacion}`);
+      lineas.push(`${nombreTicker(p.ticker)}: ${signo(p.gananciaCedear)}${formatARS(p.gananciaCedear)} (${signo(pct)}${pct.toFixed(1)}%) — ${traducirRecomendacion(idioma, p.recomendacion)}`);
     }
   }
 
-  const diagnostico = generarDiagnostico(snapshot);
+  const diagnostico = generarDiagnostico(snapshot, idioma);
   if (diagnostico) {
     lineas.push('');
-    lineas.push('— Cómo viene la cosa —');
+    lineas.push(t(idioma, 'resumen.comoVieneLaCosa'));
     lineas.push(diagnostico);
   }
 
@@ -172,9 +171,9 @@ function construirResumenTexto(snapshot, frecuencia, historial, ultimoEnvioISO) 
   const conservador = (snapshot.oportunidades?.CONSERVADOR || []).slice(0, 5).map((x) => x.ticker);
   if (agresivo.length || conservador.length) {
     lineas.push('');
-    lineas.push('⭐ Comprar ahora:');
-    if (agresivo.length) lineas.push(`Agresivo: ${agresivo.join(', ')}`);
-    if (conservador.length) lineas.push(`Conservador: ${conservador.join(', ')}`);
+    lineas.push(t(idioma, 'resumen.comprarAhora'));
+    if (agresivo.length) lineas.push(`${traducirPerfil(idioma, 'AGRESIVO')}: ${agresivo.join(', ')}`);
+    if (conservador.length) lineas.push(`${traducirPerfil(idioma, 'CONSERVADOR')}: ${conservador.join(', ')}`);
   }
 
   return lineas.join('\n');

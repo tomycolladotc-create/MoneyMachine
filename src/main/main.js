@@ -5,6 +5,7 @@ const { analizarUniverso, analizarCartera, hoyISO, obtenerHistorico } = require(
 const { puntuarCalidad } = require('./lib/scoring');
 const { detectarNovedades } = require('./lib/notificaciones');
 const { construirResumenTexto, enviarEmail, debeEnviarResumen } = require('./lib/resumenPeriodico');
+const { t: tMain } = require('./lib/i18n');
 const { fetchChart, buscarSimbolos, closePriceOnOrBefore } = require('./lib/yahoo');
 const { obtenerInflacionMensualINDEC } = require('./lib/indec');
 
@@ -56,7 +57,7 @@ function registrarHistorial(total, fecha) {
 
 function mostrarNotificaciones(anterior, nuevo, config) {
   if (!config.NOTIFICACIONES_ACTIVADAS || !Notification.isSupported()) return;
-  for (const aviso of detectarNovedades(anterior, nuevo)) {
+  for (const aviso of detectarNovedades(anterior, nuevo, config.IDIOMA)) {
     const notif = new Notification({ title: aviso.titulo, body: aviso.cuerpo });
     notif.on('click', () => {
       if (mainWindow && !mainWindow.isDestroyed()) {
@@ -89,8 +90,8 @@ async function verificarYEnviarResumenEmail(config, snapshot) {
   if (!debeEnviarResumen(config.RESUMEN_EMAIL_FRECUENCIA, config.RESUMEN_EMAIL_HORA, ultimoEnvio, hoyStr, hoy)) return;
 
   const historial = store.getHistorialCartera();
-  const texto = construirResumenTexto(snapshot, config.RESUMEN_EMAIL_FRECUENCIA, historial, ultimoEnvio);
-  await enviarEmail(datosSmtp(config), 'Panel CEDEARs — resumen de tu cartera', texto);
+  const texto = construirResumenTexto(snapshot, config.RESUMEN_EMAIL_FRECUENCIA, historial, ultimoEnvio, config.IDIOMA);
+  await enviarEmail(datosSmtp(config), tMain(config.IDIOMA, 'resumen.asuntoPeriodico'), texto);
   store.registrarUltimoEnvioResumen(hoyStr);
 }
 
@@ -287,11 +288,11 @@ ipcMain.handle('actualizar-inflacion-indec', async () => {
 ipcMain.handle('probar-resumen-email', async (_evt, config) => {
   try {
     const snapshot = store.getSnapshot();
-    if (!snapshot) return { error: 'Todavía no hay datos de la cartera para armar un resumen.' };
+    if (!snapshot) return { error: tMain(config.IDIOMA, 'resumen.sinDatosParaResumen') };
     const historial = store.getHistorialCartera();
     const ultimoEnvio = store.getUltimoEnvioResumen();
-    const texto = construirResumenTexto(snapshot, config.RESUMEN_EMAIL_FRECUENCIA, historial, ultimoEnvio);
-    await enviarEmail(datosSmtp(config), 'Panel CEDEARs — resumen de prueba', texto);
+    const texto = construirResumenTexto(snapshot, config.RESUMEN_EMAIL_FRECUENCIA, historial, ultimoEnvio, config.IDIOMA);
+    await enviarEmail(datosSmtp(config), tMain(config.IDIOMA, 'resumen.asuntoPrueba'), texto);
     return { ok: true };
   } catch (e) {
     return { error: e.message };

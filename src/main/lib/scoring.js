@@ -33,11 +33,15 @@ function scoreVolatilidad(atrRelPct) {
   return 10;
 }
 
+// Códigos estables (no textos): la traducción a lo que ve el usuario vive en
+// i18n, tanto del lado del renderer como del proceso principal (para
+// notificaciones/mail). Así cambiar de idioma no rompe ninguna comparación
+// interna que dependa de este valor.
 function señalDeTiming(score) {
-  if (score >= 75) return 'Comprar';
-  if (score >= 55) return 'Vigilar';
-  if (score >= 35) return 'Esperar';
-  return 'Evitar';
+  if (score >= 75) return 'COMPRAR';
+  if (score >= 55) return 'VIGILAR';
+  if (score >= 35) return 'ESPERAR';
+  return 'EVITAR';
 }
 
 // bars: array ordenado viejo->nuevo de { open, high, low, close }
@@ -169,11 +173,12 @@ function calcularCalidadUniverso(tickers, perfil, config) {
   return puntuarCalidad(elegibles, perfil);
 }
 
+// Código estable; ver comentario arriba de señalDeTiming.
 function clasificar(calidad, timing) {
-  if (calidad >= 68 && timing >= 78) return '⭐ Comprar ahora';
-  if (calidad >= 68 && timing < 78) return '⏳ Esperar mejor entrada';
-  if (calidad >= 48) return '✓ Vigilar';
-  return '○ Esperar';
+  if (calidad >= 68 && timing >= 78) return 'BUY_NOW';
+  if (calidad >= 68 && timing < 78) return 'WAIT_BETTER_ENTRY';
+  if (calidad >= 48) return 'WATCH';
+  return 'WAIT';
 }
 
 module.exports = {

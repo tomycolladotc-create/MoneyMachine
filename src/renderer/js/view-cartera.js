@@ -3,15 +3,16 @@ import { claseRecomendacion } from './recomendacion.js';
 import { state, setState } from './state.js';
 import { renderGlosario } from './glosario.js';
 import { attachTickerAutocomplete } from './ticker-autocomplete.js';
+import { t, traducirRecomendacion } from './i18n.js';
 
 function filaMovimiento(tickerBA, m, i) {
   return `
     <tr>
       <td>${esc(m.fecha)}</td>
-      <td class="cap">${esc(m.tipo)}</td>
+      <td class="cap">${esc(m.tipo === 'compra' ? t('cartera.compra') : t('cartera.venta'))}</td>
       <td class="num">${ars(m.monto_ars)}</td>
-      <td class="num">${m.precio != null ? num(m.precio, 2) : '<span class="muted">a resolver</span>'}</td>
-      <td><button class="icon-btn" data-action="del-mov" data-ticker="${esc(tickerBA)}" data-i="${i}" title="Eliminar movimiento">✕</button></td>
+      <td class="num">${m.precio != null ? num(m.precio, 2) : `<span class="muted">${t('cartera.aResolver')}</span>`}</td>
+      <td><button class="icon-btn" data-action="del-mov" data-ticker="${esc(tickerBA)}" data-i="${i}" title="${t('cartera.eliminarMovimiento')}">✕</button></td>
     </tr>`;
 }
 
@@ -20,12 +21,12 @@ function formNuevoMovimiento(tickerBA) {
     <form class="inline-form" data-action="add-mov" data-ticker="${esc(tickerBA)}">
       <input type="date" name="fecha" required />
       <select name="tipo">
-        <option value="compra">Compra</option>
-        <option value="venta">Venta</option>
+        <option value="compra">${t('cartera.compra')}</option>
+        <option value="venta">${t('cartera.venta')}</option>
       </select>
-      <input type="number" name="monto_ars" placeholder="Monto ARS" step="0.01" required />
-      <input type="number" name="precio" placeholder="Precio (opcional)" step="0.01" />
-      <button type="submit" class="btn-secondary">Agregar</button>
+      <input type="number" name="monto_ars" placeholder="${t('cartera.montoArs')}" step="0.01" required />
+      <input type="number" name="precio" placeholder="${t('cartera.precioOpcional')}" step="0.01" />
+      <button type="submit" class="btn-secondary">${t('cartera.agregar')}</button>
       <span class="add-mov-status save-status"></span>
     </form>`;
 }
@@ -43,8 +44,8 @@ async function resolverPrecioSiFalta(tickerBA, mov) {
 
   const sugerenciasBA = (resultado.sugerencias || []).filter((s) => s.exchange === 'BUE');
   const mensaje = sugerenciasBA.length
-    ? `No se pudo resolver el precio de ${tickerBA} en ${mov.fecha}. ¿El ticker es ${sugerenciasBA.map((s) => s.symbol).join(' o ')}? Si no, probá con otra fecha o cargá el precio a mano.`
-    : `No se pudo resolver el precio de ${tickerBA} en ${mov.fecha}. Puede que esa fecha no tenga rueda (fin de semana, feriado, fecha futura) o que el ticker esté mal. Probá otra fecha o cargá el precio a mano.`;
+    ? t('cartera.precioNoResueltoConSugerencia', { ticker: tickerBA, fecha: mov.fecha, sugerencias: sugerenciasBA.map((s) => s.symbol).join(' o ') })
+    : t('cartera.precioNoResuelto', { ticker: tickerBA, fecha: mov.fecha });
   return { ok: false, mensaje };
 }
 
@@ -58,21 +59,21 @@ function tarjetaPosicion(p, tickerBA, abierta) {
           <div class="op-ticker">${esc(tickerBA)}</div>
           <div class="op-nombre">${esc(p.nombre || '')}</div>
         </div>
-        <span class="badge ${recClase}">${esc(p.recomendacion)}</span>
+        <span class="badge ${recClase}">${esc(traducirRecomendacion(p.recomendacion))}</span>
       </header>
       <div class="pos-metrics">
-        <div><span class="metric-label">Invertido</span><span class="metric-value">${ars(p.capitalInvertido)}</span></div>
-        <div><span class="metric-label">Valor hoy</span><span class="metric-value">${ars(p.valorHoyTotal)}</span></div>
-        <div><span class="metric-label">Ganancia</span><span class="metric-value ${signClass(p.gananciaCedear)}">${ars(p.gananciaCedear)}</span></div>
-        <div><span class="metric-label">Vs. PF tradicional</span><span class="metric-value ${signClass(p.diferenciaPF)}">${ars(p.diferenciaPF)}</span></div>
-        <div><span class="metric-label">Vs. PF UVA</span><span class="metric-value ${signClass(p.diferenciaPFUva)}">${ars(p.diferenciaPFUva)}</span></div>
-        <div><span class="metric-label">Vs. S&P 500</span><span class="metric-value ${p.diferenciaBenchmark != null ? signClass(p.diferenciaBenchmark) : ''}">${p.diferenciaBenchmark != null ? ars(p.diferenciaBenchmark) : '—'}</span></div>
-        <div><span class="metric-label">Potencial</span><span class="metric-value">${p.potencialPct != null ? pct(p.potencialPct) : '—'}</span></div>
+        <div><span class="metric-label">${t('common.invertido')}</span><span class="metric-value">${ars(p.capitalInvertido)}</span></div>
+        <div><span class="metric-label">${t('common.valorHoy')}</span><span class="metric-value">${ars(p.valorHoyTotal)}</span></div>
+        <div><span class="metric-label">${t('common.ganancia')}</span><span class="metric-value ${signClass(p.gananciaCedear)}">${ars(p.gananciaCedear)}</span></div>
+        <div><span class="metric-label">${t('cartera.vsPfTradAbrev')}</span><span class="metric-value ${signClass(p.diferenciaPF)}">${ars(p.diferenciaPF)}</span></div>
+        <div><span class="metric-label">${t('cartera.vsPfUvaAbrev')}</span><span class="metric-value ${signClass(p.diferenciaPFUva)}">${ars(p.diferenciaPFUva)}</span></div>
+        <div><span class="metric-label">${t('common.vsSp500')}</span><span class="metric-value ${p.diferenciaBenchmark != null ? signClass(p.diferenciaBenchmark) : ''}">${p.diferenciaBenchmark != null ? ars(p.diferenciaBenchmark) : '—'}</span></div>
+        <div><span class="metric-label">${t('common.potencial')}</span><span class="metric-value">${p.potencialPct != null ? pct(p.potencialPct) : '—'}</span></div>
       </div>
       ${abierta ? `
         <div class="pos-detail">
           <table class="mov-table">
-            <thead><tr><th>Fecha</th><th>Tipo</th><th>Monto</th><th>Precio</th><th></th></tr></thead>
+            <thead><tr><th>${t('cartera.fecha')}</th><th>${t('cartera.tipo')}</th><th>${t('cartera.monto')}</th><th>${t('cartera.precio')}</th><th></th></tr></thead>
             <tbody>${movs.map((m, i) => filaMovimiento(tickerBA, m, i)).join('')}</tbody>
           </table>
           ${formNuevoMovimiento(tickerBA)}
@@ -80,17 +81,17 @@ function tarjetaPosicion(p, tickerBA, abierta) {
     </article>`;
 }
 
-function filaTotal(t) {
+function filaTotal(total) {
   return `
     <div class="pos-card pos-total">
-      <div class="pos-header"><div class="op-ticker">TOTAL</div></div>
+      <div class="pos-header"><div class="op-ticker">${t('cartera.total')}</div></div>
       <div class="pos-metrics">
-        <div><span class="metric-label">Invertido</span><span class="metric-value">${ars(t.capitalInvertido)}</span></div>
-        <div><span class="metric-label">Valor hoy</span><span class="metric-value">${ars(t.valorHoyTotal)}</span></div>
-        <div><span class="metric-label">Ganancia</span><span class="metric-value ${signClass(t.gananciaCedear)}">${ars(t.gananciaCedear)}</span></div>
-        <div><span class="metric-label">Vs. PF tradicional</span><span class="metric-value ${signClass(t.diferenciaPF)}">${ars(t.diferenciaPF)}</span></div>
-        <div><span class="metric-label">Vs. PF UVA</span><span class="metric-value ${signClass(t.diferenciaPFUva)}">${ars(t.diferenciaPFUva)}</span></div>
-        <div><span class="metric-label">Vs. S&P 500</span><span class="metric-value ${t.diferenciaBenchmark != null ? signClass(t.diferenciaBenchmark) : ''}">${t.diferenciaBenchmark != null ? ars(t.diferenciaBenchmark) : '—'}</span></div>
+        <div><span class="metric-label">${t('common.invertido')}</span><span class="metric-value">${ars(total.capitalInvertido)}</span></div>
+        <div><span class="metric-label">${t('common.valorHoy')}</span><span class="metric-value">${ars(total.valorHoyTotal)}</span></div>
+        <div><span class="metric-label">${t('common.ganancia')}</span><span class="metric-value ${signClass(total.gananciaCedear)}">${ars(total.gananciaCedear)}</span></div>
+        <div><span class="metric-label">${t('cartera.vsPfTradAbrev')}</span><span class="metric-value ${signClass(total.diferenciaPF)}">${ars(total.diferenciaPF)}</span></div>
+        <div><span class="metric-label">${t('cartera.vsPfUvaAbrev')}</span><span class="metric-value ${signClass(total.diferenciaPFUva)}">${ars(total.diferenciaPFUva)}</span></div>
+        <div><span class="metric-label">${t('common.vsSp500')}</span><span class="metric-value ${total.diferenciaBenchmark != null ? signClass(total.diferenciaBenchmark) : ''}">${total.diferenciaBenchmark != null ? ars(total.diferenciaBenchmark) : '—'}</span></div>
       </div>
     </div>`;
 }
@@ -106,26 +107,26 @@ export function renderCartera(container, s) {
   container.innerHTML = `
     <div class="view-header">
       <div>
-        <h1>Cartera</h1>
-        <p class="view-subtitle">Tus posiciones contra plazo fijo tradicional y plazo fijo UVA.</p>
+        <h1>${t('nav.cartera')}</h1>
+        <p class="view-subtitle">${t('cartera.subtitulo')}</p>
       </div>
-      <button class="btn-primary" id="btn-nuevo-ticker">+ Agregar ticker</button>
+      <button class="btn-primary" id="btn-nuevo-ticker">${t('cartera.agregarTicker')}</button>
     </div>
     ${agregandoTicker ? `
       <form class="inline-form" id="form-nuevo-ticker">
-        <input type="text" name="ticker" placeholder="Ticker (ej: AAPL o AAPL.BA)" required style="text-transform:uppercase" />
+        <input type="text" name="ticker" placeholder="${t('cartera.tickerPlaceholder')}" required style="text-transform:uppercase" />
         <input type="date" name="fecha" required />
-        <select name="tipo"><option value="compra">Compra</option><option value="venta">Venta</option></select>
-        <input type="number" name="monto_ars" placeholder="Monto ARS" step="0.01" required />
-        <input type="number" name="precio" placeholder="Precio (opcional)" step="0.01" />
-        <button type="submit" class="btn-secondary">Crear</button>
+        <select name="tipo"><option value="compra">${t('cartera.compra')}</option><option value="venta">${t('cartera.venta')}</option></select>
+        <input type="number" name="monto_ars" placeholder="${t('cartera.montoArs')}" step="0.01" required />
+        <input type="number" name="precio" placeholder="${t('cartera.precioOpcional')}" step="0.01" />
+        <button type="submit" class="btn-secondary">${t('cartera.crear')}</button>
         <span id="nuevo-ticker-status" class="save-status"></span>
       </form>` : ''}
     ${total ? filaTotal(total) : ''}
     <div class="pos-list">
       ${posiciones.length
         ? posiciones.map((p) => tarjetaPosicion(p, p.ticker, tickerExpandido === p.ticker)).join('')
-        : `<p class="empty-inline">Todavía no cargaste movimientos, o los datos de precio se están descargando.</p>`}
+        : `<p class="empty-inline">${t('cartera.sinMovimientos')}</p>`}
     </div>
     ${renderGlosario(['costoPromedio', 'stopLossTakeProfit', 'potencial', 'plazoFijoTradicional', 'plazoFijoUva', 'sp500', 'comision'])}`;
 
@@ -147,7 +148,7 @@ export function renderCartera(container, s) {
 
       btnSubmit.disabled = true;
       status.style.color = '';
-      status.textContent = 'Verificando el ticker…';
+      status.textContent = t('cartera.verificandoTicker');
       const validacion = await window.api.validarTickerBA(tickerBA);
       btnSubmit.disabled = false;
 
@@ -155,8 +156,8 @@ export function renderCartera(container, s) {
         status.style.color = 'var(--loss)';
         const sugerenciasBA = (validacion.sugerencias || []).filter((s) => s.exchange === 'BUE');
         status.textContent = sugerenciasBA.length
-          ? `${tickerBA} no existe en Yahoo. ¿Quisiste decir ${sugerenciasBA.map((s) => s.symbol).join(' o ')}?`
-          : `${tickerBA} no existe en Yahoo Finance. Revisá el símbolo.`;
+          ? t('cartera.tickerNoExisteConSugerencia', { ticker: tickerBA, sugerencias: sugerenciasBA.map((s) => s.symbol).join(' o ') })
+          : t('cartera.tickerNoExiste', { ticker: tickerBA });
         return;
       }
 
@@ -169,7 +170,7 @@ export function renderCartera(container, s) {
 
       btnSubmit.disabled = true;
       status.style.color = '';
-      status.textContent = 'Resolviendo el precio…';
+      status.textContent = t('cartera.resolviendoPrecio');
       const resuelto = await resolverPrecioSiFalta(tickerBA, movSinPrecio);
       btnSubmit.disabled = false;
 
@@ -188,8 +189,8 @@ export function renderCartera(container, s) {
 
   container.querySelectorAll('[data-action="toggle"]').forEach((el) => {
     el.addEventListener('click', () => {
-      const t = el.dataset.ticker;
-      tickerExpandido = tickerExpandido === t ? null : t;
+      const tk = el.dataset.ticker;
+      tickerExpandido = tickerExpandido === tk ? null : tk;
       renderCartera(container, s);
     });
   });
@@ -200,8 +201,8 @@ export function renderCartera(container, s) {
       const tickerBA = btn.dataset.ticker;
       const i = Number(btn.dataset.i);
       const mov = (state.cartera[tickerBA] || [])[i];
-      const detalle = mov ? `${mov.tipo} del ${mov.fecha} por ${ars(mov.monto_ars)}` : 'este movimiento';
-      if (!confirm(`¿Eliminar ${detalle}? No se puede deshacer.`)) return;
+      const detalle = mov ? t('cartera.detalleMovimiento', { tipo: mov.tipo === 'compra' ? t('cartera.compra') : t('cartera.venta'), fecha: mov.fecha, monto: ars(mov.monto_ars) }) : t('cartera.esteMovimiento');
+      if (!confirm(t('cartera.confirmarEliminar', { detalle }))) return;
       const movs = [...(state.cartera[tickerBA] || [])];
       movs.splice(i, 1);
       const nuevaCartera = { ...state.cartera, [tickerBA]: movs };
@@ -227,7 +228,7 @@ export function renderCartera(container, s) {
 
       btnSubmit.disabled = true;
       status.style.color = '';
-      status.textContent = 'Resolviendo el precio…';
+      status.textContent = t('cartera.resolviendoPrecio');
       const resuelto = await resolverPrecioSiFalta(tickerBA, movSinPrecio);
       btnSubmit.disabled = false;
 

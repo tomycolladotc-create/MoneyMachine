@@ -6,6 +6,7 @@ import { renderSimulador } from './view-simulador.js';
 import { renderUniverso } from './view-universo.js';
 import { renderConfig } from './view-config.js';
 import { relativeTime } from './format.js';
+import { t } from './i18n.js';
 
 const viewContainer = document.getElementById('view-container');
 const btnRefresh = document.getElementById('btn-refresh');
@@ -36,6 +37,8 @@ let ultimoConfigRenderizado = null;
 function render() {
   document.querySelectorAll('.rail-item').forEach((btn) => {
     btn.classList.toggle('is-active', btn.dataset.vista === state.vista);
+    const label = btn.querySelector('span');
+    if (label) label.textContent = t(`nav.${btn.dataset.vista}`);
   });
 
   const cambioDeVista = state.vista !== ultimaVistaRenderizada;
@@ -49,9 +52,9 @@ function render() {
   }
   ultimaVistaRenderizada = state.vista;
 
-  railUpdated.textContent = state.snapshot ? `Actualizado ${relativeTime(state.snapshot.timestamp)}` : 'Sin datos todavía';
+  railUpdated.textContent = state.snapshot ? t('rail.actualizado', { tiempo: relativeTime(state.snapshot.timestamp) }) : t('rail.sinDatos');
   btnRefresh.disabled = state.refrescando;
-  refreshLabel.textContent = state.refrescando ? 'Actualizando…' : 'Refrescar';
+  refreshLabel.textContent = state.refrescando ? t('rail.actualizando') : t('rail.refrescar');
 }
 
 subscribe(render);
@@ -78,16 +81,16 @@ window.api.onRefreshProgress((p) => {
   if (p.etapa === 'universo' && p.total > 0) {
     progressTrack.hidden = false;
     progressFill.style.width = `${(p.done / p.total) * 100}%`;
-    progressLabel.textContent = `Consultando ${p.ticker}… (${p.done}/${p.total})`;
+    progressLabel.textContent = t('rail.consultando', { ticker: p.ticker, done: p.done, total: p.total });
   } else if (p.etapa === 'cartera') {
-    progressLabel.textContent = 'Recalculando cartera…';
+    progressLabel.textContent = t('rail.recalculando');
   } else if (p.etapa === 'listo') {
     progressTrack.hidden = true;
     progressLabel.textContent = '';
     Promise.all([window.api.getSnapshot(), window.api.getHistorialCartera()])
       .then(([snapshot, historial]) => setState({ snapshot, historial }));
   } else if (p.etapa === 'error') {
-    progressLabel.textContent = `Error: ${p.mensaje}`;
+    progressLabel.textContent = t('rail.error', { mensaje: p.mensaje });
   }
 });
 

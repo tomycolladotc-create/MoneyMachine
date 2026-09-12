@@ -1,10 +1,11 @@
 import { ars, esc } from './format.js';
+import { t } from './i18n.js';
 
 // Gráfico de línea simple en SVG inline (sin librerías externas). `bars` viene
 // ordenado de más viejo a más nuevo, con `{ date, close }` por lo menos.
 export function renderPriceChart(bars, { width = 640, height = 200 } = {}) {
   if (!bars || bars.length < 2) {
-    return `<p class="empty-inline">No hay suficiente historial para graficar.</p>`;
+    return `<p class="empty-inline">${t('chart.sinHistorial')}</p>`;
   }
 
   const closes = bars.map((b) => b.close);
@@ -32,11 +33,11 @@ export function renderPriceChart(bars, { width = 640, height = 200 } = {}) {
     <div class="chart-head">
       <div>
         <span class="chart-precio">${ars(ultimo)}</span>
-        <span class="chart-variacion" style="color:${colorLinea}">${subio ? '+' : ''}${variacion}% en 12 meses</span>
+        <span class="chart-variacion" style="color:${colorLinea}">${t('chart.variacion12m', { signo: subio ? '+' : '', valor: variacion })}</span>
       </div>
       <div class="chart-rango">
-        <span>Máx ${ars(maxReal)}</span>
-        <span>Mín ${ars(min)}</span>
+        <span>${t('chart.max')} ${ars(maxReal)}</span>
+        <span>${t('chart.min')} ${ars(min)}</span>
       </div>
     </div>
     <svg viewBox="0 0 ${width} ${height}" class="price-chart" preserveAspectRatio="none">
@@ -62,7 +63,7 @@ export function renderPriceChart(bars, { width = 640, height = 200 } = {}) {
 // puntos que `fechas`.
 export function renderComparisonChart(fechas, series, { width = 640, height = 220 } = {}) {
   if (!fechas || fechas.length < 2) {
-    return `<p class="empty-inline">Todavía hay un solo día registrado. A partir del próximo refresco vas a poder ver cómo viene evolucionando.</p>`;
+    return `<p class="empty-inline">${t('chart.unSoloDia')}</p>`;
   }
 
   const todos = series.flatMap((s) => s.valores).filter((v) => v != null);

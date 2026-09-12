@@ -1,3 +1,5 @@
+import { t } from './i18n.js';
+
 export function ars(n) {
   if (n == null || Number.isNaN(n)) return '—';
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n);
@@ -35,15 +37,15 @@ export function esc(s) {
 }
 
 export function relativeTime(iso) {
-  if (!iso) return 'nunca';
+  if (!iso) return t('format.nunca');
   const diffMs = Date.now() - new Date(iso).getTime();
   const min = Math.floor(diffMs / 60000);
-  if (min < 1) return 'recién';
-  if (min === 1) return 'hace 1 minuto';
-  if (min < 60) return `hace ${min} minutos`;
+  if (min < 1) return t('format.recien');
+  if (min === 1) return t('format.hace1Minuto');
+  if (min < 60) return t('format.haceMinutos', { n: min });
   const h = Math.floor(min / 60);
-  if (h === 1) return 'hace 1 hora';
-  if (h < 24) return `hace ${h} horas`;
+  if (h === 1) return t('format.hace1Hora');
+  if (h < 24) return t('format.haceHoras', { n: h });
   const d = Math.floor(h / 24);
-  return d === 1 ? 'hace 1 día' : `hace ${d} días`;
+  return d === 1 ? t('format.hace1Dia') : t('format.haceDias', { n: d });
 }

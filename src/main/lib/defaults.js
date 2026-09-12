@@ -1,4 +1,5 @@
 const CONFIG_DEFAULT = {
+  IDIOMA: 'es', // 'es' | 'en'
   STOP_LOSS_PCT: -15.0,
   TAKE_PROFIT_PCT: 30.0,
   TASA_PF_ANUAL: 0.225,

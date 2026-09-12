@@ -105,12 +105,12 @@ async function analizarUniverso(config, universo, onProgress) {
 
   const agresivo = calcularCalidadUniverso(datos, 'AGRESIVO', config)
     .map((t) => ({ ...t, clasificacion: clasificar(t.calidad, t.timing?.score ?? 0) }))
-    .filter((t) => t.clasificacion === '⭐ Comprar ahora')
+    .filter((t) => t.clasificacion === 'BUY_NOW')
     .sort((a, b) => b.calidad - a.calidad);
 
   const conservador = calcularCalidadUniverso(datos, 'CONSERVADOR', config)
     .map((t) => ({ ...t, clasificacion: clasificar(t.calidad, t.timing?.score ?? 0) }))
-    .filter((t) => t.clasificacion === '⭐ Comprar ahora')
+    .filter((t) => t.clasificacion === 'BUY_NOW')
     .sort((a, b) => b.calidad - a.calidad);
 
   return { datos, fallaron, oportunidades: { AGRESIVO: agresivo, CONSERVADOR: conservador } };

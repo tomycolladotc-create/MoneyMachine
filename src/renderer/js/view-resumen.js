@@ -1,6 +1,7 @@
 import { ars, pct, signClass, esc, relativeTime } from './format.js';
 import { renderGlosario } from './glosario.js';
 import { renderComparisonChart } from './chart.js';
+import { t } from './i18n.js';
 
 function tile(label, value, sub, cls = '') {
   return `
@@ -11,25 +12,25 @@ function tile(label, value, sub, cls = '') {
     </div>`;
 }
 
-function filaOportunidad(t) {
+function filaOportunidad(op) {
   return `
     <li class="mini-row">
-      <span class="mini-ticker">${esc(t.ticker)}</span>
-      <span class="mini-nombre">${esc(t.nombre)}</span>
-      <span class="mini-calidad">${t.calidad.toFixed(0)}</span>
+      <span class="mini-ticker">${esc(op.ticker)}</span>
+      <span class="mini-nombre">${esc(op.nombre)}</span>
+      <span class="mini-calidad">${op.calidad.toFixed(0)}</span>
     </li>`;
 }
 
 function renderEvolucion(historial) {
   if (!historial || historial.length === 0) {
-    return `<p class="empty-inline">Todavía no hay historial registrado — se va guardando un punto por día a partir de hoy.</p>`;
+    return `<p class="empty-inline">${t('resumen.sinHistorial')}</p>`;
   }
   const fechas = historial.map((p) => p.fecha);
   const series = [
-    { nombre: 'Tu cartera', color: 'var(--accent)', valores: historial.map((p) => p.valorHoyTotal) },
-    { nombre: 'Plazo fijo tradicional', color: 'var(--accent-2)', valores: historial.map((p) => p.capitalInvertido + p.gananciaPF) },
-    { nombre: 'Plazo fijo UVA', color: 'var(--purple)', punteada: true, valores: historial.map((p) => p.capitalInvertido + p.gananciaPFUva) },
-    { nombre: 'S&P 500 (CEDEAR)', color: 'var(--info)', punteada: true, valores: historial.map((p) => (p.gananciaBenchmark != null ? p.capitalInvertido + p.gananciaBenchmark : null)) },
+    { nombre: t('resumen.serieCartera'), color: 'var(--accent)', valores: historial.map((p) => p.valorHoyTotal) },
+    { nombre: t('common.plazoFijoTradicional'), color: 'var(--accent-2)', valores: historial.map((p) => p.capitalInvertido + p.gananciaPF) },
+    { nombre: t('common.plazoFijoUva'), color: 'var(--purple)', punteada: true, valores: historial.map((p) => p.capitalInvertido + p.gananciaPFUva) },
+    { nombre: t('resumen.serieSp500'), color: 'var(--info)', punteada: true, valores: historial.map((p) => (p.gananciaBenchmark != null ? p.capitalInvertido + p.gananciaBenchmark : null)) },
   ];
   return renderComparisonChart(fechas, series);
 }
@@ -40,15 +41,15 @@ export function renderResumen(container, state) {
   if (!snap) {
     container.innerHTML = `
       <section class="empty-state">
-        <h2>Todavía no hay datos</h2>
-        <p>Se está haciendo la primera consulta a Yahoo Finance. Esto puede tardar unos minutos la primera vez porque se piden ${'>'}150 tickers con una pausa entre cada uno para no saturar el servicio.</p>
+        <h2>${t('resumen.sinDatos')}</h2>
+        <p>${t('resumen.sinDatosDetalle')}</p>
       </section>`;
     return;
   }
 
-  const t = snap.cartera.total;
+  const total = snap.cartera.total;
   const errores = snap.fallaron?.length
-    ? `<div class="banner banner-warn">Yahoo no respondió para ${snap.fallaron.length} ticker${snap.fallaron.length === 1 ? '' : 's'}. Se van a reintentar en el próximo refresco. <button class="link-btn" id="ver-errores">Ver detalle</button></div>`
+    ? `<div class="banner banner-warn">${t('resumen.fallaronTickers', { n: snap.fallaron.length })} <button class="link-btn" id="ver-errores">${t('resumen.verDetalle')}</button></div>`
     : '';
 
   const topAgresivo = snap.oportunidades.AGRESIVO.slice(0, 5);
@@ -57,39 +58,39 @@ export function renderResumen(container, state) {
   container.innerHTML = `
     <div class="view-header">
       <div>
-        <h1>Resumen</h1>
-        <p class="view-subtitle">Cartera propia vs. plazo fijo · actualizado ${relativeTime(snap.timestamp)}</p>
+        <h1>${t('nav.resumen')}</h1>
+        <p class="view-subtitle">${t('resumen.subtitulo', { tiempo: relativeTime(snap.timestamp) })}</p>
       </div>
     </div>
     ${errores}
     <div class="kpi-grid">
-      ${tile('Total invertido', ars(t.capitalInvertido))}
-      ${tile('Valor hoy', ars(t.valorHoyTotal))}
-      ${tile('Ganancia', ars(t.gananciaCedear), pct((t.gananciaCedear / t.capitalInvertido) * 100), signClass(t.gananciaCedear))}
-      ${tile('Vs. plazo fijo tradicional', ars(t.diferenciaPF), t.diferenciaPF >= 0 ? 'le gana al plazo fijo' : 'pierde contra el plazo fijo', signClass(t.diferenciaPF))}
-      ${tile('Vs. plazo fijo UVA', ars(t.diferenciaPFUva), t.diferenciaPFUva >= 0 ? 'le gana al plazo fijo UVA' : 'pierde contra el plazo fijo UVA', signClass(t.diferenciaPFUva))}
-      ${t.diferenciaBenchmark != null
-        ? tile('Vs. S&P 500', ars(t.diferenciaBenchmark), t.diferenciaBenchmark >= 0 ? 'le gana al S&P 500' : 'pierde contra el S&P 500', signClass(t.diferenciaBenchmark))
-        : tile('Vs. S&P 500', '—', 'sin dato disponible hoy')}
+      ${tile(t('common.invertido'), ars(total.capitalInvertido))}
+      ${tile(t('common.valorHoy'), ars(total.valorHoyTotal))}
+      ${tile(t('common.ganancia'), ars(total.gananciaCedear), pct((total.gananciaCedear / total.capitalInvertido) * 100), signClass(total.gananciaCedear))}
+      ${tile(t('common.vsPfTradicional'), ars(total.diferenciaPF), total.diferenciaPF >= 0 ? t('common.leGanaPf') : t('common.pierdePf'), signClass(total.diferenciaPF))}
+      ${tile(t('common.vsPfUva'), ars(total.diferenciaPFUva), total.diferenciaPFUva >= 0 ? t('common.leGanaPfUva') : t('common.pierdePfUva'), signClass(total.diferenciaPFUva))}
+      ${total.diferenciaBenchmark != null
+        ? tile(t('common.vsSp500'), ars(total.diferenciaBenchmark), total.diferenciaBenchmark >= 0 ? t('common.leGanaSp500') : t('common.pierdeSp500'), signClass(total.diferenciaBenchmark))
+        : tile(t('common.vsSp500'), '—', t('common.sinDatoHoy'))}
     </div>
 
     <section class="panel chart-container" style="margin-bottom:20px">
-      <h2>Evolución de tu cartera</h2>
+      <h2>${t('resumen.evolucionCartera')}</h2>
       ${renderEvolucion(state.historial)}
     </section>
 
     <div class="two-col">
       <section class="panel">
-        <h2>⭐ Comprar ahora — Agresivo</h2>
+        <h2>⭐ ${t('resumen.comprarAhora')} — ${t('common.agresivo')}</h2>
         ${topAgresivo.length
           ? `<ul class="mini-list">${topAgresivo.map(filaOportunidad).join('')}</ul>`
-          : `<p class="empty-inline">Ningún ticker del universo agresivo califica hoy: ninguno superó a la vez el piso de calidad (68) y de timing (78) con los filtros actuales.</p>`}
+          : `<p class="empty-inline">${t('resumen.ningunoCalificaAgresivo')}</p>`}
       </section>
       <section class="panel">
-        <h2>⭐ Comprar ahora — Conservador</h2>
+        <h2>⭐ ${t('resumen.comprarAhora')} — ${t('common.conservador')}</h2>
         ${topConservador.length
           ? `<ul class="mini-list">${topConservador.map(filaOportunidad).join('')}</ul>`
-          : `<p class="empty-inline">Ningún ticker del universo conservador califica hoy: ninguno superó a la vez el piso de calidad (68) y de timing (78) con los filtros actuales.</p>`}
+          : `<p class="empty-inline">${t('resumen.ningunoCalificaConservador')}</p>`}
       </section>
     </div>
     ${renderGlosario(['cedear', 'calidad', 'clasificacion', 'plazoFijoTradicional', 'plazoFijoUva', 'sp500'])}`;

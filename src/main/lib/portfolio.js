@@ -144,15 +144,16 @@ function calcularPosicion(ticker, movimientos, precioActualARS, fechaHoy, config
   };
 }
 
+// Código estable (no texto): ver comentario sobre señalDeTiming en scoring.js.
 function calcularRecomendacion(posicion, precioActualARS, potencialPct, config) {
-  if (!posicion.posicionAbierta || posicion.costoPromedio == null) return 'posición cerrada';
+  if (!posicion.posicionAbierta || posicion.costoPromedio == null) return 'CLOSED';
   const varPct = ((precioActualARS - posicion.costoPromedio) / posicion.costoPromedio) * 100;
-  if (varPct <= config.STOP_LOSS_PCT) return '🚨 VENDER (Stop Loss)';
+  if (varPct <= config.STOP_LOSS_PCT) return 'STOP_LOSS';
   if (varPct >= config.TAKE_PROFIT_PCT) {
-    if (potencialPct != null && potencialPct > 15) return '💎 MANTENER';
-    return '💰 VENDER (Take Profit)';
+    if (potencialPct != null && potencialPct > 15) return 'TAKE_PROFIT_HOLD';
+    return 'TAKE_PROFIT_SELL';
   }
-  return '✅ Mantener';
+  return 'HOLD';
 }
 
 function totalizar(posiciones) {
