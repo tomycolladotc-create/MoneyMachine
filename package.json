@@ -12,11 +12,11 @@
     "dist": "electron-builder --win"
   },
   "dependencies": {
-    "nodemailer": "^6.9.15"
+    "nodemailer": "^10.0.9"
   },
   "devDependencies": {
-    "electron": "^33.0.0",
-    "electron-builder": "^25.1.8"
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3"
   },
   "build": {
     "appId": "com.tomycollado.panelcedears",
