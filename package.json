@@ -1,7 +1,7 @@
 {
   "name": "panel-cedears",
   "productName": "Panel CEDEARs",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Dashboard de escritorio para analisis de CEDEARs argentinos con datos en vivo de Yahoo Finance",
   "main": "src/main/main.js",
   "author": "Tomy Collado",
