@@ -13,6 +13,18 @@ function mesActualISO() {
   return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
 }
 
+function renderTasaPfKpi(c) {
+  if (c.TASA_PF_ANUAL == null) return `<p class="empty-inline">${t('config.sinDatoBcra')}</p>`;
+  const etiqueta = c.TASA_PF_ANUAL_FECHA
+    ? t('config.tasaPfAlFecha', { fecha: esc(c.TASA_PF_ANUAL_FECHA) })
+    : t('config.tasaPfTradicional');
+  return `
+    <div class="kpi">
+      <div class="kpi-label">${etiqueta}</div>
+      <div class="kpi-value">${(c.TASA_PF_ANUAL * 100).toFixed(2)}%</div>
+    </div>`;
+}
+
 function renderInflacionKpis(c) {
   const meses = Object.entries(c.INFLACION_MENSUAL).sort(([a], [b]) => a.localeCompare(b));
   if (meses.length === 0) return `<p class="empty-inline">${t('config.sinDatoIndec')}</p>`;
@@ -81,8 +93,13 @@ export function renderConfig(container, state) {
 
       <section class="panel">
         <h2>${t('config.seccionPlazosFijos')}</h2>
+        <p class="hint">${t('config.hintTasaPf')}</p>
+        <div class="kpi-grid" id="tasa-pf-kpi" style="margin-bottom:14px">${renderTasaPfKpi(c)}</div>
+        <div class="form-actions" style="margin-bottom:14px">
+          <button type="button" class="btn-secondary" id="btn-actualizar-bcra">${t('config.actualizarBcra')}</button>
+          <span id="bcra-status" class="save-status"></span>
+        </div>
         <div class="field-grid">
-          <label>${t('config.tasaPfTradicional')}<input type="number" name="TASA_PF_ANUAL" value="${c.TASA_PF_ANUAL * 100}" step="0.1" /></label>
           <label>${t('config.plusPfUva')}<input type="number" name="TASA_PF_UVA_PLUS_ANUAL" value="${c.TASA_PF_UVA_PLUS_ANUAL * 100}" step="0.1" /></label>
         </div>
       </section>
@@ -190,12 +207,36 @@ export function renderConfig(container, state) {
     status.textContent = t('config.actualizadoUltimoMes', { mes: ultimoMes ?? '—' });
   });
 
+  container.querySelector('#btn-actualizar-bcra').addEventListener('click', async (ev) => {
+    const btn = ev.target;
+    const status = container.querySelector('#bcra-status');
+    btn.disabled = true;
+    status.style.color = '';
+    status.textContent = t('config.consultandoBcra');
+
+    const resultado = await window.api.actualizarTasaPfBcra();
+    btn.disabled = false;
+
+    if (!resultado.ok) {
+      status.style.color = 'var(--loss)';
+      status.textContent = t('config.noSePudoActualizar', { error: resultado.error });
+      return;
+    }
+
+    state.config = resultado.config; // silencioso, no dispara un re-render
+    container.querySelector('#tasa-pf-kpi').innerHTML = renderTasaPfKpi(resultado.config);
+
+    status.style.color = 'var(--gain)';
+    status.textContent = t('config.actualizadoTasaPf', { tasa: (resultado.config.TASA_PF_ANUAL * 100).toFixed(2) });
+  });
+
   // Arma el config completo a partir de lo que hay tipeado AHORA en el
   // formulario (no solo lo ya guardado) — lo usan tanto "Guardar" como
   // "Enviar de prueba", para que probar el mail también deje persistido todo
   // lo demás que hayas tocado y una actualización de fondo no te lo borre.
-  // La inflación no se lee del formulario porque ya no es editable ahí: la
-  // trae y la aplica sola "Actualizar desde INDEC ahora" (y cada refresco).
+  // Ni la inflación ni la tasa de plazo fijo se leen del formulario porque ya
+  // no son editables ahí: las trae y las aplica solas "Actualizar desde INDEC
+  // ahora" / "Actualizar desde BCRA ahora" (y cada refresco).
   function leerConfigDelFormulario() {
     const fd = new FormData(container.querySelector('#form-config'));
 
@@ -205,7 +246,6 @@ export function renderConfig(container, state) {
       STOP_LOSS_PCT: Number(fd.get('STOP_LOSS_PCT')),
       TAKE_PROFIT_PCT: Number(fd.get('TAKE_PROFIT_PCT')),
       COMISION_PCT: Number(fd.get('COMISION_PCT')) / 100,
-      TASA_PF_ANUAL: Number(fd.get('TASA_PF_ANUAL')) / 100,
       TASA_PF_UVA_PLUS_ANUAL: Number(fd.get('TASA_PF_UVA_PLUS_ANUAL')) / 100,
       MIN_ANALISTAS_RANKING: Number(fd.get('MIN_ANALISTAS_RANKING')),
       MIN_POTENCIAL_RANKING: Number(fd.get('MIN_POTENCIAL_RANKING')),

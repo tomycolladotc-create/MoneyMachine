@@ -1,12 +1,14 @@
-import { ars, esc } from './format.js';
+import { ars, usd, esc } from './format.js';
 import { t } from './i18n.js';
 
 // Gráfico de línea simple en SVG inline (sin librerías externas). `bars` viene
 // ordenado de más viejo a más nuevo, con `{ date, close }` por lo menos.
-export function renderPriceChart(bars, { width = 640, height = 200 } = {}) {
+// `moneda`: 'ARS' (CEDEAR, default) o 'USD' (acción de Wall Street).
+export function renderPriceChart(bars, { width = 640, height = 200, moneda = 'ARS' } = {}) {
   if (!bars || bars.length < 2) {
     return `<p class="empty-inline">${t('chart.sinHistorial')}</p>`;
   }
+  const formatearPrecio = moneda === 'USD' ? usd : ars;
 
   const closes = bars.map((b) => b.close);
   const min = Math.min(...closes);
@@ -32,12 +34,12 @@ export function renderPriceChart(bars, { width = 640, height = 200 } = {}) {
   return `
     <div class="chart-head">
       <div>
-        <span class="chart-precio">${ars(ultimo)}</span>
+        <span class="chart-precio">${formatearPrecio(ultimo)}</span>
         <span class="chart-variacion" style="color:${colorLinea}">${t('chart.variacion12m', { signo: subio ? '+' : '', valor: variacion })}</span>
       </div>
       <div class="chart-rango">
-        <span>${t('chart.max')} ${ars(maxReal)}</span>
-        <span>${t('chart.min')} ${ars(min)}</span>
+        <span>${t('chart.max')} ${formatearPrecio(maxReal)}</span>
+        <span>${t('chart.min')} ${formatearPrecio(min)}</span>
       </div>
     </div>
     <svg viewBox="0 0 ${width} ${height}" class="price-chart" preserveAspectRatio="none">

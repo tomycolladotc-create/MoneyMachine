@@ -1,11 +1,16 @@
 const { fetchChart, fetchQuoteSummary, closePriceOnOrBefore, fetchFxRateToUSD, sleep } = require('./yahoo');
-const { computeTimingScore, calcularCalidadUniverso, clasificar } = require('./scoring');
+const { computeTimingScore, calcularCalidadUniverso, clasificar, clasificarSoloTiming } = require('./scoring');
 const { calcularPosicion, calcularRecomendacion, totalizar, buscarPrecioEnFecha } = require('./portfolio');
 const { fundamentalsTicker } = require('./overrides');
+const { tipoDeTicker } = require('./tipos');
 
-// CEDEAR del ETF que sigue al S&P 500, usado como benchmark "vs. el mercado
-// americano" para la cartera propia (en pesos, sin tener que convertir moneda).
-const BENCHMARK_TICKER = 'SPY.BA';
+// Benchmark "contra qué se compara" la cartera propia, según la moneda de
+// cada posición: el CEDEAR del S&P 500 en pesos, el ETF real (Wall Street) en
+// dólares para acciones, y Bitcoin para cripto — cada una se compara en su
+// propia moneda, sin inventar ninguna conversión entre pesos y dólares.
+const BENCHMARK_TICKER_ARS = 'SPY.BA';
+const BENCHMARK_TICKER_USD = 'SPY';
+const BENCHMARK_TICKER_CRYPTO = 'BTC-USD';
 
 function hoyISO() {
   return new Date().toISOString().slice(0, 10);
@@ -30,9 +35,16 @@ async function fxRateCacheada(currency) {
   return rate;
 }
 
-async function fetchTicker(tickerBare, sector) {
-  const tickerBA = tickerBare + '.BA';
-  const fundTicker = fundamentalsTicker(tickerBare);
+// tipo: 'CEDEAR' (default, cotiza en pesos en BYMA vía sufijo ".BA"),
+// 'ACCION' (acción de Wall Street en dólares) o 'CRYPTO' (criptomoneda en
+// dólares, ticker con sufijo "-USD") — para ACCION y CRYPTO el ticker pasado
+// ES el símbolo real de mercado, tanto para el precio como para fundamentals
+// (que en el caso de CRYPTO van a venir vacíos: Yahoo no tiene ingresos, ROE
+// ni rating de analistas para criptomonedas — ver clasificarSoloTiming).
+async function fetchTicker(tickerBare, sector, tipo = 'CEDEAR') {
+  const esCedear = tipo === 'CEDEAR';
+  const tickerBA = esCedear ? tickerBare + '.BA' : tickerBare;
+  const fundTicker = esCedear ? fundamentalsTicker(tickerBare) : tickerBare;
   const [chart, qs] = await Promise.all([
     fetchChart(tickerBA, { range: '1y', interval: '1d' }),
     fetchQuoteSummary(fundTicker),
@@ -43,16 +55,19 @@ async function fetchTicker(tickerBare, sector) {
   const potencialPct = current && target ? ((target - current) / current) * 100 : null;
 
   // marketCap/totalRevenue vienen en la moneda de reporte del emisor (USD para
-  // la mayoría, pero BRL/MXN/EUR para las overrides de Brasil/México/Europa).
-  // Se normalizan a USD para que los umbrales de los filtros duros sean comparables.
-  const moneda = qs.financialData?.financialCurrency || 'USD';
-  const fx = await fxRateCacheada(moneda);
+  // la mayoría, pero BRL/MXN/EUR para las overrides de Brasil/México/Europa,
+  // y ya USD de por sí para una acción de Wall Street). Se normalizan a USD
+  // para que los umbrales de los filtros duros sean comparables.
+  const monedaReporte = qs.financialData?.financialCurrency || 'USD';
+  const fx = await fxRateCacheada(monedaReporte);
   const marketCapRaw = qs.summaryDetail?.marketCap?.raw ?? qs.price?.marketCap?.raw ?? null;
   const totalRevenueRaw = qs.financialData?.totalRevenue?.raw ?? null;
 
   return {
     ticker: tickerBare,
-    tickerBA,
+    tickerBA, // símbolo real de mercado usado para precio/histórico (con o sin sufijo según tipo)
+    tipo,
+    moneda: esCedear ? 'ARS' : 'USD', // moneda en la que cotiza el precio de mercado (no la de fundamentals, ya normalizada a USD arriba)
     nombre: qs.price?.longName || qs.price?.shortName || tickerBare,
     sector: sector || 'Otro',
     marketCap: marketCapRaw != null && fx != null ? marketCapRaw * fx : marketCapRaw,
@@ -63,7 +78,7 @@ async function fetchTicker(tickerBare, sector) {
     revenueGrowth: qs.financialData?.revenueGrowth?.raw ?? null,
     returnOnEquity: qs.financialData?.returnOnEquity?.raw ?? null,
     debtToEquity: qs.financialData?.debtToEquity?.raw ?? null,
-    precioARS: chart.regularMarketPrice ?? chart.bars[chart.bars.length - 1]?.close ?? null,
+    precio: chart.regularMarketPrice ?? chart.bars[chart.bars.length - 1]?.close ?? null,
     timing,
     bars: chart.bars,
   };
@@ -85,7 +100,7 @@ async function analizarUniverso(config, universo, onProgress) {
 
   for (let i = 0; i < universo.length; i += TICKERS_POR_TANDA) {
     const tanda = universo.slice(i, i + TICKERS_POR_TANDA);
-    const resultados = await Promise.allSettled(tanda.map(({ ticker: t, sector }) => fetchTicker(t, sector)));
+    const resultados = await Promise.allSettled(tanda.map(({ ticker: t, sector, tipo }) => fetchTicker(t, sector, tipo)));
 
     resultados.forEach((r, idx) => {
       const { ticker: t } = tanda[idx];
@@ -113,17 +128,44 @@ async function analizarUniverso(config, universo, onProgress) {
     .filter((t) => t.clasificacion === 'BUY_NOW')
     .sort((a, b) => b.calidad - a.calidad);
 
-  return { datos, fallaron, oportunidades: { AGRESIVO: agresivo, CONSERVADOR: conservador } };
+  // Cripto no tiene Calidad posible (sin ingresos/ROE/deuda/analistas en
+  // Yahoo), así que nunca pasa el filtro duro de calcularCalidadUniverso ni
+  // entra a las listas de arriba — se clasifica aparte, solo por Timing, y se
+  // suma al final de las dos listas (no hay distinción Agresivo/Conservador
+  // posible para cripto sin datos fundamentales).
+  const cripto = datos
+    .filter((t) => t.tipo === 'CRYPTO')
+    .map((t) => ({ ...t, calidad: null, clasificacion: clasificarSoloTiming(t.timing?.score ?? 0) }))
+    .filter((t) => t.clasificacion === 'BUY_NOW')
+    .sort((a, b) => (b.timing?.score ?? 0) - (a.timing?.score ?? 0));
+
+  return {
+    datos,
+    fallaron,
+    oportunidades: { AGRESIVO: [...agresivo, ...cripto], CONSERVADOR: [...conservador, ...cripto] },
+  };
 }
 
-async function construirBenchmark() {
+async function construirBenchmarkDe(tickerBenchmark) {
   try {
-    const chart = await fetchChart(BENCHMARK_TICKER, { range: 'max', interval: '1d' });
+    const chart = await fetchChart(tickerBenchmark, { range: 'max', interval: '1d' });
     const precioHoy = chart.regularMarketPrice ?? chart.bars[chart.bars.length - 1]?.close ?? null;
     return { precioEnFecha: (fecha) => buscarPrecioEnFecha(chart.bars, fecha), precioHoy };
   } catch (e) {
     return null; // sin benchmark disponible; la cartera se sigue calculando igual, solo sin esa comparación
   }
+}
+
+// Arma los tres benchmarks (S&P 500 en pesos vía CEDEAR, S&P 500 en dólares
+// vía el ETF real, y Bitcoin para cripto) en paralelo — cada posición usa el
+// que le corresponde según su tipo.
+async function construirBenchmarks() {
+  const [ars, usd, crypto] = await Promise.all([
+    construirBenchmarkDe(BENCHMARK_TICKER_ARS),
+    construirBenchmarkDe(BENCHMARK_TICKER_USD),
+    construirBenchmarkDe(BENCHMARK_TICKER_CRYPTO),
+  ]);
+  return { CEDEAR: ars, ACCION: usd, CRYPTO: crypto };
 }
 
 async function resolverPrecioMovimiento(tickerBA, movimiento) {
@@ -133,20 +175,24 @@ async function resolverPrecioMovimiento(tickerBA, movimiento) {
   return precio;
 }
 
-// cartera: { 'TICKER.BA': [movimientos] }
+// cartera: { 'TICKER.BA': [movimientos] } para CEDEARs en pesos, { 'TICKER':
+// [movimientos] } (sin sufijo) para acciones de Wall Street, o
+// { 'TICKER-USD': [movimientos] } para criptomonedas — el tipo de cada
+// posición se infiere de esa misma clave (ver tipos.js).
 // datosUniverso: array devuelto por analizarUniverso (para reusar precio actual/potencial ya bajados)
 async function analizarCartera(cartera, datosUniverso, config) {
   const hoy = hoyISO();
-  const porTickerBare = new Map(datosUniverso.map((d) => [d.ticker, d]));
+  const porSimbolo = new Map(datosUniverso.map((d) => [d.tickerBA, d]));
   const posiciones = [];
   const fallaron = [];
 
   const tieneMovimientos = Object.values(cartera).some((m) => m && m.length > 0);
-  const benchmark = tieneMovimientos ? await construirBenchmark() : null;
+  const benchmarks = tieneMovimientos ? await construirBenchmarks() : { CEDEAR: null, ACCION: null, CRYPTO: null };
 
   for (const [tickerBA, movimientosRaw] of Object.entries(cartera)) {
     if (!movimientosRaw || movimientosRaw.length === 0) continue;
-    const tickerBare = tickerBA.replace(/\.BA$/i, '');
+    const tipo = tipoDeTicker(tickerBA);
+    const tickerDisplay = tickerBA.replace(/\.BA$/i, '');
     try {
       const movimientos = [];
       for (const m of movimientosRaw) {
@@ -154,23 +200,27 @@ async function analizarCartera(cartera, datosUniverso, config) {
         movimientos.push({ ...m, precio });
       }
 
-      let precioActual = porTickerBare.get(tickerBare)?.precioARS;
-      let potencialPct = porTickerBare.get(tickerBare)?.potencialPct ?? null;
+      const datosTicker = porSimbolo.get(tickerBA);
+      let precioActual = datosTicker?.precio;
+      let potencialPct = datosTicker?.potencialPct ?? null;
       if (precioActual == null) {
         const chart = await fetchChart(tickerBA, { range: '5d', interval: '1d' });
         precioActual = chart.regularMarketPrice ?? chart.bars[chart.bars.length - 1]?.close;
       }
 
+      const benchmark = benchmarks[tipo];
       const posicion = calcularPosicion(tickerBA, movimientos, precioActual, hoy, config, benchmark);
       const recomendacion = calcularRecomendacion(posicion, precioActual, potencialPct, config);
-      posiciones.push({ ...posicion, precioActual, potencialPct, recomendacion, nombre: porTickerBare.get(tickerBare)?.nombre ?? tickerBare });
+      posiciones.push({ ...posicion, precioActual, potencialPct, recomendacion, nombre: datosTicker?.nombre ?? tickerDisplay });
     } catch (e) {
       fallaron.push({ ticker: tickerBA, error: e.message });
     }
   }
 
-  const total = totalizar(posiciones);
-  return { posiciones, total, fallaron };
+  const total = totalizar(posiciones.filter((p) => p.tipo === 'CEDEAR'));
+  const totalUsd = totalizar(posiciones.filter((p) => p.tipo === 'ACCION'));
+  const totalCrypto = totalizar(posiciones.filter((p) => p.tipo === 'CRYPTO'));
+  return { posiciones, total, totalUsd, totalCrypto, fallaron };
 }
 
 module.exports = { analizarUniverso, analizarCartera, hoyISO, fetchTicker, obtenerHistorico };

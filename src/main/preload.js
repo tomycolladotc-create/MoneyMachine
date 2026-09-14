@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('api', {
   getHistorialCartera: () => ipcRenderer.invoke('get-historial-cartera'),
   probarResumenEmail: (config) => ipcRenderer.invoke('probar-resumen-email', config),
   actualizarInflacionIndec: () => ipcRenderer.invoke('actualizar-inflacion-indec'),
+  actualizarTasaPfBcra: () => ipcRenderer.invoke('actualizar-tasa-pf-bcra'),
   buscarTicker: (query) => ipcRenderer.invoke('buscar-ticker', query),
   validarTickerBA: (tickerBA) => ipcRenderer.invoke('validar-ticker-ba', tickerBA),
   resolverPrecioFecha: (tickerBA, fecha) => ipcRenderer.invoke('resolver-precio-fecha', { tickerBA, fecha }),

@@ -8,6 +8,7 @@ const { construirResumenTexto, enviarEmail, debeEnviarResumen } = require('./lib
 const { t: tMain } = require('./lib/i18n');
 const { fetchChart, buscarSimbolos, closePriceOnOrBefore } = require('./lib/yahoo');
 const { obtenerInflacionMensualINDEC } = require('./lib/indec');
+const { obtenerTasaPlazoFijoBCRA } = require('./lib/bcra');
 
 app.setAppUserModelId('com.tomycollado.panelcedears');
 
@@ -111,6 +112,15 @@ async function actualizarInflacionDesdeIndec(config) {
   return nuevoConfig;
 }
 
+// Trae la tasa de plazo fijo tradicional publicada por el BCRA y la aplica
+// entera — no es editable a mano, igual que la inflación de INDEC arriba.
+async function actualizarTasaPfDesdeBcra(config) {
+  const { tasaAnual, fecha } = await obtenerTasaPlazoFijoBCRA();
+  const nuevoConfig = { ...config, TASA_PF_ANUAL: tasaAnual, TASA_PF_ANUAL_FECHA: fecha };
+  store.saveConfig(nuevoConfig);
+  return nuevoConfig;
+}
+
 function sendProgress(payload) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('refresh-progress', payload);
@@ -126,6 +136,11 @@ async function runRefresh() {
       config = await actualizarInflacionDesdeIndec(config);
     } catch (e) {
       if (!app.isPackaged) console.log('[indec]', e.message);
+    }
+    try {
+      config = await actualizarTasaPfDesdeBcra(config);
+    } catch (e) {
+      if (!app.isPackaged) console.log('[bcra]', e.message);
     }
     const cartera = store.getCartera();
     const universo = store.getUniverso();
@@ -147,7 +162,7 @@ async function runRefresh() {
       fecha: hoyISO(),
       fallaron: [...fallaron, ...carteraResultado.fallaron],
       oportunidades,
-      cartera: { posiciones: carteraResultado.posiciones, total: carteraResultado.total },
+      cartera: { posiciones: carteraResultado.posiciones, total: carteraResultado.total, totalUsd: carteraResultado.totalUsd, totalCrypto: carteraResultado.totalCrypto },
       // se guarda sin `bars` (historial diario) para no inflar el JSON:
       // alcanza con precio/fundamentals para recalcular la cartera sin pedirle todo a Yahoo de nuevo.
       datos: datos.map(({ bars, ...resto }) => resto),
@@ -206,18 +221,28 @@ ipcMain.handle('get-historico', async (_evt, tickerBA) => {
 ipcMain.handle('simular-cartera', (_evt, { perfil, tickers }) => {
   const snapshot = store.getSnapshot();
   const datos = snapshot?.datos || [];
-  const porTicker = new Map(datos.map((d) => [d.ticker, d]));
+  // Se busca por símbolo de mercado (tickerBA), no por ticker pelado: una
+  // misma empresa puede estar a la vez como CEDEAR ("AAPL" + ".BA") y como
+  // acción de Wall Street ("AAPL" sin sufijo) y ambas comparten el mismo
+  // ticker pelado, así que solo el símbolo completo identifica cada una sin ambigüedad.
+  const porSimbolo = new Map(datos.map((d) => [d.tickerBA, d]));
 
   const encontrados = [];
   const noEncontrados = [];
   for (const t of tickers) {
-    const d = porTicker.get(t);
+    const d = porSimbolo.get(t);
     if (d) encontrados.push(d);
     else noEncontrados.push(t);
   }
 
-  const puntuados = puntuarCalidad(encontrados, perfil);
-  return { resultado: puntuados, noEncontrados };
+  // Cripto no tiene Calidad posible (sin ingresos/ROE/deuda/analistas en
+  // Yahoo): se puntúa aparte para no corromper los percentiles de Calidad de
+  // los CEDEARs/acciones con los que comparte el pedido, y queda con
+  // calidad null explícito (el simulador la reparte por Timing en su lugar).
+  const paraCalidad = encontrados.filter((d) => d.tipo !== 'CRYPTO');
+  const cripto = encontrados.filter((d) => d.tipo === 'CRYPTO').map((d) => ({ ...d, calidad: null }));
+  const puntuados = puntuarCalidad(paraCalidad, perfil);
+  return { resultado: [...puntuados, ...cripto], noEncontrados };
 });
 ipcMain.handle('save-cartera', async (_evt, cartera) => {
   store.saveCartera(cartera);
@@ -227,7 +252,7 @@ ipcMain.handle('save-cartera', async (_evt, cartera) => {
   const carteraResultado = await analizarCartera(cartera, datos, config);
   const nuevoSnapshot = {
     ...(snapshot || { timestamp: new Date().toISOString(), fecha: hoyISO(), fallaron: [], oportunidades: { AGRESIVO: [], CONSERVADOR: [] }, datos: [] }),
-    cartera: { posiciones: carteraResultado.posiciones, total: carteraResultado.total },
+    cartera: { posiciones: carteraResultado.posiciones, total: carteraResultado.total, totalUsd: carteraResultado.totalUsd, totalCrypto: carteraResultado.totalCrypto },
   };
   store.saveSnapshot(nuevoSnapshot);
   registrarHistorial(carteraResultado.total, nuevoSnapshot.fecha || hoyISO());
@@ -279,6 +304,15 @@ ipcMain.handle('resolver-precio-fecha', async (_evt, { tickerBA, fecha }) => {
 ipcMain.handle('actualizar-inflacion-indec', async () => {
   try {
     const config = await actualizarInflacionDesdeIndec(store.getConfig());
+    return { ok: true, config };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+ipcMain.handle('actualizar-tasa-pf-bcra', async () => {
+  try {
+    const config = await actualizarTasaPfDesdeBcra(store.getConfig());
     return { ok: true, config };
   } catch (e) {
     return { ok: false, error: e.message };

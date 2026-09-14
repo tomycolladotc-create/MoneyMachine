@@ -39,6 +39,7 @@ const DICT = {
         TAKE_PROFIT_HOLD: '💎 MANTENER', TAKE_PROFIT_SELL: '💰 VENDER (Take Profit)', HOLD: '✅ Mantener',
       },
       perfil: { AGRESIVO: 'Agresivo', CONSERVADOR: 'Conservador' },
+      tipoActivo: { CEDEAR: 'CEDEAR', ACCION: 'Acción', CRYPTO: 'Cripto' },
     },
     chart: {
       sinHistorial: 'No hay suficiente historial para graficar.',
@@ -142,6 +143,14 @@ const DICT = {
         titulo: '¿Qué es un CEDEAR?',
         texto: 'Un certificado que representa una acción extranjera (por ejemplo, de una empresa de EE.UU.) pero que cotiza en pesos en la bolsa de Buenos Aires, para poder comprarla desde acá sin sacar la plata del país.',
       },
+      accionWallStreet: {
+        titulo: '¿Qué es una "Acción" acá?',
+        texto: 'A diferencia de un CEDEAR, es la acción real comprada directo en una bolsa de Estados Unidos (Wall Street), en dólares. Se sigue con su ticker sin sufijo (ej. "AAPL" en vez de "AAPL.BA") y no se mezcla con los totales en pesos de tus CEDEARs.',
+      },
+      cripto: {
+        titulo: '¿Cómo se evalúan las criptomonedas acá?',
+        texto: 'Una cripto no tiene ingresos, ROE, deuda ni rating de analistas, así que no se le puede calcular Calidad como a una empresa. Por eso solo se clasifica por Timing (Entrada): "⭐ Comprar ahora" significa que el precio viene en buen momento técnico, no un juicio sobre si el proyecto es bueno o malo. Se sigue con el ticker de Yahoo Finance (ej. "BTC-USD") y se compara contra Bitcoin, en dólares, sin mezclarse con tus CEDEARs ni acciones.',
+      },
       perfiles: {
         titulo: 'Perfil Agresivo vs. Conservador',
         texto: 'Dos formas de filtrar oportunidades. Agresivo acepta empresas más chicas y de mayor riesgo/potencial. Conservador exige empresas grandes y más golpeadas, priorizando seguridad por sobre potencial.',
@@ -170,14 +179,20 @@ const DICT = {
       leGanaPf: 'le gana al plazo fijo', pierdePf: 'pierde contra el plazo fijo',
       leGanaPfUva: 'le gana al plazo fijo UVA', pierdePfUva: 'pierde contra el plazo fijo UVA',
       leGanaSp500: 'le gana al S&P 500', pierdeSp500: 'pierde contra el S&P 500',
+      leGanaBtc: 'le gana a Bitcoin', pierdeBtc: 'pierde contra Bitcoin',
       sinDatoHoy: 'sin dato disponible hoy',
+      cedear: 'CEDEAR', accion: 'Acción', cripto: 'Cripto',
+      vsSp500Usd: 'Vs. S&P 500 (USD)',
+      vsBtcUsd: 'Vs. Bitcoin (USD)',
     },
     cartera: {
       subtitulo: 'Tus posiciones contra plazo fijo tradicional y plazo fijo UVA.',
       agregarTicker: '+ Agregar ticker',
       tickerPlaceholder: 'Ticker (ej: AAPL o AAPL.BA)',
+      tickerPlaceholderAccion: 'Ticker de Wall Street (ej: AAPL)',
+      tickerPlaceholderCripto: 'Ticker de cripto (ej: BTC-USD)',
       compra: 'Compra', venta: 'Venta',
-      montoArs: 'Monto ARS', precioOpcional: 'Precio (opcional)',
+      montoArs: 'Monto ARS', montoUsd: 'Monto USD', precioOpcional: 'Precio (opcional)',
       crear: 'Crear', agregar: 'Agregar',
       aResolver: 'a resolver', eliminarMovimiento: 'Eliminar movimiento',
       fecha: 'Fecha', tipo: 'Tipo', monto: 'Monto', precio: 'Precio',
@@ -215,20 +230,31 @@ const DICT = {
     },
     universo: {
       subtitulo: ({ n }) => `Los tickers que se escanean para armar el ranking de Oportunidades. ${n} en total.`,
-      tickerPlaceholder: 'Ticker (ej: AAPL o AAPL.BA)', sectorPlaceholder: 'Sector',
+      tickerPlaceholder: 'Ticker (ej: AAPL o AAPL.BA)',
+      tickerPlaceholderAccion: 'Ticker de Wall Street (ej: AAPL)',
+      tickerPlaceholderCripto: 'Ticker de cripto (ej: BTC-USD)',
+      sectorPlaceholder: 'Sector',
       agregar: '+ Agregar',
       hintCambios: 'Los cambios se aplican recién en el próximo refresco (manual o automático), no hace falta reiniciar la app.',
       buscarPlaceholder: 'Buscar por ticker o sector…',
-      ticker: 'Ticker', sector: 'Sector',
+      ticker: 'Ticker', sector: 'Sector', tipo: 'Tipo',
       sinResultados: 'Sin resultados para ese filtro.',
       sacarDelUniverso: 'Sacar del universo',
       yaExiste: ({ ticker }) => `${ticker} ya está en el universo.`,
+      traerAccionesPopulares: '+ Traer acciones populares',
+      traerCriptosPopulares: '+ Traer criptos populares',
+      todasYaAgregadas: 'Ya están todas agregadas.',
     },
     simulador: {
       titulo: 'Simulador de cartera',
-      subtitulo: 'Metés un presupuesto y lo reparte entre las oportunidades del perfil elegido, según el score de Calidad de cada una dentro del grupo. Es una simulación: no toca tu cartera real.',
+      subtitulo: 'Metés un presupuesto y lo reparte entre las oportunidades del perfil elegido, según Calidad (CEDEARs/Acciones) o Timing (Cripto, que no tiene Calidad). Es una simulación: no toca tu cartera real.',
       esperandoPrimerRefresco: 'Todavía no hay datos del universo de CEDEARs. Esperá al primer refresco.',
-      perfil: 'Perfil', presupuestoTotal: 'Presupuesto total (ARS)',
+      perfil: 'Perfil',
+      componerCon: '¿Con qué la armamos?',
+      hintPresupuestoPorMoneda: 'CEDEARs reparte un presupuesto en pesos; Acción y Cripto comparten uno en dólares (no se convierte entre las dos monedas). Podés dejar marcado más de uno a la vez.',
+      elegiUnTipo: 'Marcá al menos un tipo de activo para armar una cartera sugerida.',
+      presupuestoArs: 'Presupuesto en pesos (ARS)',
+      presupuestoUsd: 'Presupuesto en dólares (USD)',
       candidatos: ({ n }) => `Candidatos (${n})`,
       sinCandidatos: 'No hay tickers en "⭐ Comprar ahora" para este perfil hoy. Agregá alguno a mano abajo, o probá con el otro perfil.',
       agregarAMano: 'Agregar ticker a mano (ej: AAPL)',
@@ -239,7 +265,7 @@ const DICT = {
       noAlcanzaNiUno: 'Con este presupuesto no te alcanza para comprar ni 1 unidad de ninguno de los tickers elegidos. Subí el presupuesto o sacá los más caros de la selección.',
       detallePorTicker: 'Detalle por ticker',
       empresa: 'Empresa', pctCartera: '% cartera', precioActual: 'Precio actual', cantidad: 'Cantidad',
-      hintCantidad: 'A cada ticker incluido se le reserva primero la plata de 1 unidad al precio actual; el resto del presupuesto se reparte a prorrata de Calidad. Por eso "Cantidad" nunca da 0 para los que quedaron en la tabla.',
+      hintCantidad: 'A cada CEDEAR incluido se le reserva primero la plata de 1 unidad entera al precio actual (acá no se puede comprar fraccionado); el resto del presupuesto se reparte a prorrata del peso de cada uno. Acción y Cripto no necesitan esa reserva (se compran fraccionadas) y su "Cantidad" se muestra con decimales.',
       errorSinDatos: ({ ticker }) => `${ticker} no tiene datos recientes en el último refresco.`,
       elegiUnTicker: 'Elegí al menos un ticker.',
       presupuestoMayorCero: 'El presupuesto tiene que ser mayor a cero.',
@@ -282,6 +308,12 @@ const DICT = {
       stopLoss: 'Stop loss (%)', takeProfit: 'Take profit (%)', comisionBroker: 'Comisión broker (%)',
       seccionPlazosFijos: 'Plazos fijos',
       tasaPfTradicional: 'Tasa plazo fijo tradicional (% anual)', plusPfUva: 'Plus plazo fijo UVA (% anual)',
+      hintTasaPf: 'Se trae sola del BCRA (tasa de depósitos a plazo fijo a 30 días, dato oficial) en cada refresco automático y se aplica directa — no es editable a mano.',
+      sinDatoBcra: 'Todavía no se pudo traer ningún dato del BCRA.',
+      tasaPfAlFecha: ({ fecha }) => `Tasa plazo fijo tradicional (dato del ${fecha})`,
+      actualizarBcra: 'Actualizar desde BCRA ahora',
+      consultandoBcra: 'Consultando BCRA…',
+      actualizadoTasaPf: ({ tasa }) => `Actualizado — tasa: ${tasa}%.`,
       seccionRanking: 'Ranking de oportunidades',
       minAnalistas: 'Mínimo de analistas', potencialMinimo: 'Potencial mínimo (%)',
       seccionActualizacion: 'Actualización',
@@ -350,6 +382,7 @@ const DICT = {
         TAKE_PROFIT_HOLD: '💎 HOLD', TAKE_PROFIT_SELL: '💰 SELL (Take Profit)', HOLD: '✅ Hold',
       },
       perfil: { AGRESIVO: 'Aggressive', CONSERVADOR: 'Conservative' },
+      tipoActivo: { CEDEAR: 'CEDEAR', ACCION: 'Stock', CRYPTO: 'Crypto' },
     },
     chart: {
       sinHistorial: 'Not enough history to chart.',
@@ -453,6 +486,14 @@ const DICT = {
         titulo: 'What is a CEDEAR?',
         texto: 'A certificate representing a foreign stock (e.g. a US company) that trades in pesos on the Buenos Aires exchange, so it can be bought from here without taking money out of the country.',
       },
+      accionWallStreet: {
+        titulo: 'What is a "Stock" here?',
+        texto: 'Unlike a CEDEAR, this is the real share bought directly on a US exchange (Wall Street), in dollars. It\'s tracked by its plain ticker with no suffix (e.g. "AAPL" instead of "AAPL.BA") and isn\'t mixed with your CEDEARs\' peso totals.',
+      },
+      cripto: {
+        titulo: 'How is crypto evaluated here?',
+        texto: 'A cryptocurrency has no revenue, ROE, debt, or analyst rating, so it can\'t get a Quality score like a company. That\'s why it\'s classified by Timing (Entry) alone: "⭐ Buy now" means the price is at a good technical moment, not a judgment on whether the project itself is good. It\'s tracked using its Yahoo Finance ticker (e.g. "BTC-USD") and compared against Bitcoin, in dollars, without mixing with your CEDEARs or stocks.',
+      },
       perfiles: {
         titulo: 'Aggressive vs. Conservative profile',
         texto: 'Two ways to filter opportunities. Aggressive accepts smaller, higher risk/potential companies. Conservative requires large, more established companies, prioritizing safety over potential.',
@@ -481,14 +522,20 @@ const DICT = {
       leGanaPf: 'beats the time deposit', pierdePf: 'loses to the time deposit',
       leGanaPfUva: 'beats the UVA time deposit', pierdePfUva: 'loses to the UVA time deposit',
       leGanaSp500: 'beats the S&P 500', pierdeSp500: 'loses to the S&P 500',
+      leGanaBtc: 'beats Bitcoin', pierdeBtc: 'loses to Bitcoin',
       sinDatoHoy: 'no data available today',
+      cedear: 'CEDEAR', accion: 'Stock', cripto: 'Crypto',
+      vsSp500Usd: 'Vs. S&P 500 (USD)',
+      vsBtcUsd: 'Vs. Bitcoin (USD)',
     },
     cartera: {
       subtitulo: 'Your positions against a traditional time deposit and a UVA time deposit.',
       agregarTicker: '+ Add ticker',
       tickerPlaceholder: 'Ticker (e.g. AAPL or AAPL.BA)',
+      tickerPlaceholderAccion: 'Wall Street ticker (e.g. AAPL)',
+      tickerPlaceholderCripto: 'Crypto ticker (e.g. BTC-USD)',
       compra: 'Buy', venta: 'Sell',
-      montoArs: 'Amount ARS', precioOpcional: 'Price (optional)',
+      montoArs: 'Amount ARS', montoUsd: 'Amount USD', precioOpcional: 'Price (optional)',
       crear: 'Create', agregar: 'Add',
       aResolver: 'to resolve', eliminarMovimiento: 'Delete entry',
       fecha: 'Date', tipo: 'Type', monto: 'Amount', precio: 'Price',
@@ -526,20 +573,31 @@ const DICT = {
     },
     universo: {
       subtitulo: ({ n }) => `The tickers scanned to build the Opportunities ranking. ${n} total.`,
-      tickerPlaceholder: 'Ticker (e.g. AAPL or AAPL.BA)', sectorPlaceholder: 'Sector',
+      tickerPlaceholder: 'Ticker (e.g. AAPL or AAPL.BA)',
+      tickerPlaceholderAccion: 'Wall Street ticker (e.g. AAPL)',
+      tickerPlaceholderCripto: 'Crypto ticker (e.g. BTC-USD)',
+      sectorPlaceholder: 'Sector',
       agregar: '+ Add',
       hintCambios: 'Changes only take effect on the next refresh (manual or automatic) — no need to restart the app.',
       buscarPlaceholder: 'Search by ticker or sector…',
-      ticker: 'Ticker', sector: 'Sector',
+      ticker: 'Ticker', sector: 'Sector', tipo: 'Type',
       sinResultados: 'No results for that filter.',
       sacarDelUniverso: 'Remove from universe',
       yaExiste: ({ ticker }) => `${ticker} is already in the universe.`,
+      traerAccionesPopulares: '+ Bring in popular stocks',
+      traerCriptosPopulares: '+ Bring in popular crypto',
+      todasYaAgregadas: 'They\'re all already added.',
     },
     simulador: {
       titulo: 'Portfolio simulator',
-      subtitulo: 'Enter a budget and it gets split across the opportunities of the chosen profile, weighted by each one\'s Quality score within the group. It\'s a simulation: it doesn\'t touch your real portfolio.',
+      subtitulo: 'Enter a budget and it gets split across the opportunities of the chosen profile, weighted by Quality (CEDEARs/Stocks) or Timing (Crypto, which has no Quality score). It\'s a simulation: it doesn\'t touch your real portfolio.',
       esperandoPrimerRefresco: 'No CEDEAR universe data yet. Wait for the first refresh.',
-      perfil: 'Profile', presupuestoTotal: 'Total budget (ARS)',
+      perfil: 'Profile',
+      componerCon: 'What should it be made of?',
+      hintPresupuestoPorMoneda: 'CEDEARs splits a budget in pesos; Stocks and Crypto share one in dollars (no conversion happens between the two currencies). You can leave more than one checked at a time.',
+      elegiUnTipo: 'Check at least one asset type to build a suggested portfolio.',
+      presupuestoArs: 'Budget in pesos (ARS)',
+      presupuestoUsd: 'Budget in dollars (USD)',
       candidatos: ({ n }) => `Candidates (${n})`,
       sinCandidatos: 'There are no tickers in "⭐ Buy now" for this profile today. Add one by hand below, or try the other profile.',
       agregarAMano: 'Add a ticker by hand (e.g. AAPL)',
@@ -550,7 +608,7 @@ const DICT = {
       noAlcanzaNiUno: 'This budget isn\'t enough to buy even 1 unit of any of the chosen tickers. Raise the budget or remove the pricier ones from the selection.',
       detallePorTicker: 'Detail by ticker',
       empresa: 'Company', pctCartera: '% portfolio', precioActual: 'Current price', cantidad: 'Quantity',
-      hintCantidad: 'Each included ticker first gets reserved the money for 1 unit at the current price; the rest of the budget is split pro-rata by Quality. That\'s why "Quantity" is never 0 for the ones that made it into the table.',
+      hintCantidad: 'Each included CEDEAR first gets reserved the money for 1 whole unit at the current price (no fractional purchases here); the rest of the budget is split pro-rata by each one\'s weight. Stock and Crypto don\'t need that reservation (they\'re bought fractionally) and their "Quantity" is shown with decimals.',
       errorSinDatos: ({ ticker }) => `${ticker} has no recent data from the last refresh.`,
       elegiUnTicker: 'Choose at least one ticker.',
       presupuestoMayorCero: 'The budget has to be greater than zero.',
@@ -593,6 +651,12 @@ const DICT = {
       stopLoss: 'Stop loss (%)', takeProfit: 'Take profit (%)', comisionBroker: 'Broker fee (%)',
       seccionPlazosFijos: 'Time deposits',
       tasaPfTradicional: 'Traditional time deposit rate (% annual)', plusPfUva: 'UVA time deposit extra rate (% annual)',
+      hintTasaPf: 'Fetched automatically from the BCRA (official 30-day time deposit rate) on every automatic refresh and applied directly — not editable by hand.',
+      sinDatoBcra: 'No BCRA data could be fetched yet.',
+      tasaPfAlFecha: ({ fecha }) => `Traditional time deposit rate (data from ${fecha})`,
+      actualizarBcra: 'Update from BCRA now',
+      consultandoBcra: 'Querying BCRA…',
+      actualizadoTasaPf: ({ tasa }) => `Updated — rate: ${tasa}%.`,
       seccionRanking: 'Opportunity ranking',
       minAnalistas: 'Minimum analysts', potencialMinimo: 'Minimum potential (%)',
       seccionActualizacion: 'Updates',
@@ -654,4 +718,17 @@ export function traducirRecomendacion(codigo) {
 
 export function traducirPerfil(codigo) {
   return t(`codes.perfil.${codigo}`) || codigo || '';
+}
+
+export function traducirTipoActivo(codigo) {
+  return t(`codes.tipoActivo.${codigo}`) || codigo || '';
+}
+
+// Clase de color del chip CEDEAR/Acción/Cripto — distinta a propósito para
+// que se puedan diferenciar de un vistazo en las tarjetas donde aparecen
+// mezcladas.
+export function claseChipTipo(codigo) {
+  if (codigo === 'ACCION') return 'chip-tipo-accion';
+  if (codigo === 'CRYPTO') return 'chip-tipo-crypto';
+  return 'chip-tipo-cedear';
 }

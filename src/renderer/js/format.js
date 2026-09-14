@@ -5,6 +5,33 @@ export function ars(n) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n);
 }
 
+export function usd(n) {
+  if (n == null || Number.isNaN(n)) return '—';
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+}
+
+// Infiere el tipo de un ticker a partir de su propio símbolo de mercado: los
+// CEDEARs siempre terminan en ".BA" (BYMA), las criptomonedas en "-USD" (la
+// convención de Yahoo Finance para pares cripto/dólar, ej. "BTC-USD"), y todo
+// lo demás es una acción de Wall Street cotizando directo en dólares.
+export function tipoDeTicker(tickerBA) {
+  const t = (tickerBA || '').toUpperCase();
+  if (t.endsWith('.BA')) return 'CEDEAR';
+  if (t.endsWith('-USD')) return 'CRYPTO';
+  return 'ACCION';
+}
+
+// Ticker de un CEDEAR (termina en ".BA") o de un activo en dólares (acción o
+// cripto) — determina en qué moneda mostrar montos de esa posición.
+export function esTickerAccion(tickerBA) {
+  return tipoDeTicker(tickerBA) !== 'CEDEAR';
+}
+
+// Aplica el formato de moneda que corresponde según el tipo de ticker.
+export function moneda(n, tickerBA) {
+  return esTickerAccion(tickerBA) ? usd(n) : ars(n);
+}
+
 export function pct(n, decimals = 1) {
   if (n == null || Number.isNaN(n)) return '—';
   return `${n >= 0 ? '+' : ''}${n.toFixed(decimals)}%`;

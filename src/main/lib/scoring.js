@@ -181,11 +181,20 @@ function clasificar(calidad, timing) {
   return 'WAIT';
 }
 
+// Para criptomonedas no hay Calidad posible (Yahoo no tiene ingresos, ROE,
+// deuda ni rating de analistas para cripto) — se clasifican solo por Timing.
+function clasificarSoloTiming(timing) {
+  if (timing >= 78) return 'BUY_NOW';
+  if (timing >= 55) return 'WATCH';
+  return 'WAIT';
+}
+
 module.exports = {
   computeTimingScore,
   calcularCalidadUniverso,
   puntuarCalidad,
   pasaFiltroDuro,
   clasificar,
+  clasificarSoloTiming,
   percentiles,
 };

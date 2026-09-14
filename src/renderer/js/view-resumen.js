@@ -1,7 +1,8 @@
-import { ars, pct, signClass, esc, relativeTime } from './format.js';
+import { ars, usd, pct, signClass, esc, relativeTime } from './format.js';
 import { renderGlosario } from './glosario.js';
 import { renderComparisonChart } from './chart.js';
-import { t } from './i18n.js';
+import { agruparPorTicker } from './agrupar-oportunidades.js';
+import { t, traducirTipoActivo, claseChipTipo } from './i18n.js';
 
 function tile(label, value, sub, cls = '') {
   return `
@@ -12,12 +13,14 @@ function tile(label, value, sub, cls = '') {
     </div>`;
 }
 
-function filaOportunidad(op) {
+function filaOportunidad(grupo) {
+  const chipsTipo = grupo.instancias.map((i) => `<span class="chip ${claseChipTipo(i.tipo)}">${esc(traducirTipoActivo(i.tipo))}</span>`).join(' ');
   return `
     <li class="mini-row">
-      <span class="mini-ticker">${esc(op.ticker)}</span>
-      <span class="mini-nombre">${esc(op.nombre)}</span>
-      <span class="mini-calidad">${op.calidad.toFixed(0)}</span>
+      <span class="mini-ticker">${esc(grupo.ticker)}</span>
+      ${chipsTipo}
+      <span class="mini-nombre">${esc(grupo.nombre)}</span>
+      <span class="mini-calidad">${grupo.calidad != null ? grupo.calidad.toFixed(0) : '—'}</span>
     </li>`;
 }
 
@@ -48,12 +51,14 @@ export function renderResumen(container, state) {
   }
 
   const total = snap.cartera.total;
+  const totalUsd = snap.cartera.totalUsd;
+  const totalCrypto = snap.cartera.totalCrypto;
   const errores = snap.fallaron?.length
     ? `<div class="banner banner-warn">${t('resumen.fallaronTickers', { n: snap.fallaron.length })} <button class="link-btn" id="ver-errores">${t('resumen.verDetalle')}</button></div>`
     : '';
 
-  const topAgresivo = snap.oportunidades.AGRESIVO.slice(0, 5);
-  const topConservador = snap.oportunidades.CONSERVADOR.slice(0, 5);
+  const topAgresivo = agruparPorTicker(snap.oportunidades.AGRESIVO).slice(0, 5);
+  const topConservador = agruparPorTicker(snap.oportunidades.CONSERVADOR).slice(0, 5);
 
   container.innerHTML = `
     <div class="view-header">
@@ -74,6 +79,28 @@ export function renderResumen(container, state) {
         : tile(t('common.vsSp500'), '—', t('common.sinDatoHoy'))}
     </div>
 
+    ${totalUsd && totalUsd.capitalInvertido > 0 ? `
+    <div class="kpi-grid" style="margin-top:10px">
+      <div class="kpi-grid-titulo" style="grid-column:1/-1"><span class="chip chip-tipo-accion">${esc(traducirTipoActivo('ACCION'))}</span></div>
+      ${tile(t('common.invertido'), usd(totalUsd.capitalInvertido))}
+      ${tile(t('common.valorHoy'), usd(totalUsd.valorHoyTotal))}
+      ${tile(t('common.ganancia'), usd(totalUsd.gananciaCedear), pct((totalUsd.gananciaCedear / totalUsd.capitalInvertido) * 100), signClass(totalUsd.gananciaCedear))}
+      ${totalUsd.diferenciaBenchmark != null
+        ? tile(t('common.vsSp500Usd'), usd(totalUsd.diferenciaBenchmark), totalUsd.diferenciaBenchmark >= 0 ? t('common.leGanaSp500') : t('common.pierdeSp500'), signClass(totalUsd.diferenciaBenchmark))
+        : tile(t('common.vsSp500Usd'), '—', t('common.sinDatoHoy'))}
+    </div>` : ''}
+
+    ${totalCrypto && totalCrypto.capitalInvertido > 0 ? `
+    <div class="kpi-grid" style="margin-top:10px">
+      <div class="kpi-grid-titulo" style="grid-column:1/-1"><span class="chip chip-tipo-crypto">${esc(traducirTipoActivo('CRYPTO'))}</span></div>
+      ${tile(t('common.invertido'), usd(totalCrypto.capitalInvertido))}
+      ${tile(t('common.valorHoy'), usd(totalCrypto.valorHoyTotal))}
+      ${tile(t('common.ganancia'), usd(totalCrypto.gananciaCedear), pct((totalCrypto.gananciaCedear / totalCrypto.capitalInvertido) * 100), signClass(totalCrypto.gananciaCedear))}
+      ${totalCrypto.diferenciaBenchmark != null
+        ? tile(t('common.vsBtcUsd'), usd(totalCrypto.diferenciaBenchmark), totalCrypto.diferenciaBenchmark >= 0 ? t('common.leGanaBtc') : t('common.pierdeBtc'), signClass(totalCrypto.diferenciaBenchmark))
+        : tile(t('common.vsBtcUsd'), '—', t('common.sinDatoHoy'))}
+    </div>` : ''}
+
     <section class="panel chart-container" style="margin-bottom:20px">
       <h2>${t('resumen.evolucionCartera')}</h2>
       ${renderEvolucion(state.historial)}
@@ -93,7 +120,7 @@ export function renderResumen(container, state) {
           : `<p class="empty-inline">${t('resumen.ningunoCalificaConservador')}</p>`}
       </section>
     </div>
-    ${renderGlosario(['cedear', 'calidad', 'clasificacion', 'plazoFijoTradicional', 'plazoFijoUva', 'sp500'])}`;
+    ${renderGlosario(['cedear', 'calidad', 'clasificacion', 'plazoFijoTradicional', 'plazoFijoUva', 'sp500', 'accionWallStreet', 'cripto'])}`;
 
   const btn = container.querySelector('#ver-errores');
   if (btn) btn.addEventListener('click', () => {

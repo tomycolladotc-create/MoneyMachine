@@ -336,6 +336,31 @@ h2 {
   padding: 3px 9px;
   white-space: nowrap;
 }
+.chip-tipo-cedear {
+  color: var(--accent-2);
+  background: color-mix(in srgb, var(--accent-2) 16%, transparent);
+}
+.chip-tipo-accion {
+  color: var(--info);
+  background: color-mix(in srgb, var(--info) 16%, transparent);
+}
+.chip-tipo-crypto {
+  color: var(--purple);
+  background: color-mix(in srgb, var(--purple) 16%, transparent);
+}
+
+.tipo-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tipo-radio input[type="radio"] { accent-color: var(--accent); }
+
+.kpi-grid-titulo { margin-bottom: -2px; }
 
 .op-metrics {
   display: grid;
@@ -502,6 +527,13 @@ label input, label select {
 
 .sim-controls { max-width: 760px; }
 
+.check-row-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.check-row-group .check-row { padding: 6px 10px; }
+
 .check-list {
   display: flex;
   flex-direction: column;
@@ -653,6 +685,21 @@ label input, label select {
   margin-bottom: 18px;
 }
 .modal-header-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+
+.modal-tipo-selector { display: flex; gap: 8px; margin-bottom: 16px; }
+.chip-btn {
+  font-size: 11px;
+  font-family: inherit;
+  border-radius: 100px;
+  padding: 5px 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  border: 1px solid transparent;
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+.chip-btn:hover { opacity: 0.85; }
+.chip-btn.is-active { opacity: 1; border-color: currentColor; }
 
 .chart-container {
   background: var(--surface-2);

@@ -35,6 +35,11 @@ function formatARS(n) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n);
 }
 
+function formatUSD(n) {
+  if (n == null || Number.isNaN(n)) return '—';
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+}
+
 function signo(n) {
   return n >= 0 ? '+' : '';
 }
@@ -71,7 +76,9 @@ function lineaEvolucionDesdeUltimoEnvio(total, historial, ultimoEnvioISO, idioma
 // ya se ve en Cartera/Resumen) — no es asesoramiento financiero personalizado.
 function generarDiagnostico(snapshot, idioma) {
   const total = snapshot?.cartera?.total;
-  const posiciones = (snapshot?.cartera?.posiciones || []).filter((p) => p.posicionAbierta);
+  // Solo CEDEARs (pesos): plazo fijo, inflación y concentración no se pueden
+  // comparar en la misma cuenta contra posiciones en dólares.
+  const posiciones = (snapshot?.cartera?.posiciones || []).filter((p) => p.posicionAbierta && !p.esAccion);
   if (!total || total.capitalInvertido === 0 || posiciones.length === 0) return null;
 
   const comparaciones = [total.diferenciaPF, total.diferenciaPFUva, total.diferenciaBenchmark].filter((v) => v != null);
@@ -123,34 +130,42 @@ function generarDiagnostico(snapshot, idioma) {
 // desde el resumen anterior. idioma: 'es' | 'en'.
 function construirResumenTexto(snapshot, frecuencia, historial, ultimoEnvioISO, idioma) {
   const total = snapshot?.cartera?.total;
+  const totalUsdInicial = snapshot?.cartera?.totalUsd;
+  const totalCryptoInicial = snapshot?.cartera?.totalCrypto;
   const posiciones = snapshot?.cartera?.posiciones || [];
   const fecha = snapshot?.fecha || '';
   const etiqueta = t(idioma, `frecuencia.${frecuencia}`) || frecuencia;
 
-  if (!total || total.capitalInvertido === 0) {
+  const hayArs = total && total.capitalInvertido > 0;
+  const hayUsd = totalUsdInicial && totalUsdInicial.capitalInvertido > 0;
+  const hayCrypto = totalCryptoInicial && totalCryptoInicial.capitalInvertido > 0;
+  if (!hayArs && !hayUsd && !hayCrypto) {
     return `${t(idioma, 'resumen.encabezado', { etiqueta, fecha })}\n\n${t(idioma, 'resumen.sinMovimientos')}`;
   }
 
-  const gananciaPct = total.capitalInvertido ? (total.gananciaCedear / total.capitalInvertido) * 100 : 0;
-  const lineas = [
-    t(idioma, 'resumen.encabezado', { etiqueta, fecha }),
-    '',
-    `💰 ${t(idioma, 'resumen.invertido')}: ${formatARS(total.capitalInvertido)}`,
-    `📈 ${t(idioma, 'resumen.valorHoy')}: ${formatARS(total.valorHoyTotal)}`,
-    `${total.gananciaCedear >= 0 ? '✅' : '🔻'} ${t(idioma, 'resumen.ganancia')}: ${formatARS(total.gananciaCedear)} (${signo(gananciaPct)}${gananciaPct.toFixed(1)}%)`,
-  ];
+  const lineas = [t(idioma, 'resumen.encabezado', { etiqueta, fecha })];
 
-  const lineaEvolucion = lineaEvolucionDesdeUltimoEnvio(total, historial, ultimoEnvioISO, idioma);
-  if (lineaEvolucion) lineas.push(lineaEvolucion);
+  if (hayArs) {
+    const gananciaPct = total.capitalInvertido ? (total.gananciaCedear / total.capitalInvertido) * 100 : 0;
+    lineas.push(
+      '',
+      `💰 ${t(idioma, 'resumen.invertido')}: ${formatARS(total.capitalInvertido)}`,
+      `📈 ${t(idioma, 'resumen.valorHoy')}: ${formatARS(total.valorHoyTotal)}`,
+      `${total.gananciaCedear >= 0 ? '✅' : '🔻'} ${t(idioma, 'resumen.ganancia')}: ${formatARS(total.gananciaCedear)} (${signo(gananciaPct)}${gananciaPct.toFixed(1)}%)`,
+    );
 
-  lineas.push('');
-  lineas.push(`${t(idioma, 'resumen.vsPf')}: ${signo(total.diferenciaPF)}${formatARS(total.diferenciaPF)}`);
-  lineas.push(`${t(idioma, 'resumen.vsPfUva')}: ${signo(total.diferenciaPFUva)}${formatARS(total.diferenciaPFUva)}`);
-  if (total.diferenciaBenchmark != null) {
-    lineas.push(`${t(idioma, 'resumen.vsSp500')}: ${signo(total.diferenciaBenchmark)}${formatARS(total.diferenciaBenchmark)}`);
+    const lineaEvolucion = lineaEvolucionDesdeUltimoEnvio(total, historial, ultimoEnvioISO, idioma);
+    if (lineaEvolucion) lineas.push(lineaEvolucion);
+
+    lineas.push('');
+    lineas.push(`${t(idioma, 'resumen.vsPf')}: ${signo(total.diferenciaPF)}${formatARS(total.diferenciaPF)}`);
+    lineas.push(`${t(idioma, 'resumen.vsPfUva')}: ${signo(total.diferenciaPFUva)}${formatARS(total.diferenciaPFUva)}`);
+    if (total.diferenciaBenchmark != null) {
+      lineas.push(`${t(idioma, 'resumen.vsSp500')}: ${signo(total.diferenciaBenchmark)}${formatARS(total.diferenciaBenchmark)}`);
+    }
   }
 
-  const posicionesAbiertas = posiciones.filter((p) => p.posicionAbierta);
+  const posicionesAbiertas = posiciones.filter((p) => p.posicionAbierta && !p.esAccion);
   if (posicionesAbiertas.length > 0) {
     lineas.push('');
     lineas.push(t(idioma, 'resumen.comoVienenPosiciones'));
@@ -165,6 +180,50 @@ function construirResumenTexto(snapshot, frecuencia, historial, ultimoEnvioISO, 
     lineas.push('');
     lineas.push(t(idioma, 'resumen.comoVieneLaCosa'));
     lineas.push(diagnostico);
+  }
+
+  // Acciones de Wall Street (dólares): sección aparte, sin mezclar con los
+  // totales en pesos de arriba ni convertir a un tipo de cambio.
+  const totalUsd = snapshot?.cartera?.totalUsd;
+  const posicionesUsdAbiertas = posiciones.filter((p) => p.posicionAbierta && p.tipo === 'ACCION');
+  if (totalUsd && totalUsd.capitalInvertido > 0) {
+    const gananciaPctUsd = totalUsd.capitalInvertido ? (totalUsd.gananciaCedear / totalUsd.capitalInvertido) * 100 : 0;
+    lineas.push('');
+    lineas.push(t(idioma, 'resumen.tituloAcciones'));
+    lineas.push(`💰 ${t(idioma, 'resumen.invertido')}: ${formatUSD(totalUsd.capitalInvertido)}`);
+    lineas.push(`📈 ${t(idioma, 'resumen.valorHoy')}: ${formatUSD(totalUsd.valorHoyTotal)}`);
+    lineas.push(`${totalUsd.gananciaCedear >= 0 ? '✅' : '🔻'} ${t(idioma, 'resumen.ganancia')}: ${formatUSD(totalUsd.gananciaCedear)} (${signo(gananciaPctUsd)}${gananciaPctUsd.toFixed(1)}%)`);
+    if (totalUsd.diferenciaBenchmark != null) {
+      lineas.push(`${t(idioma, 'resumen.vsSp500')}: ${signo(totalUsd.diferenciaBenchmark)}${formatUSD(totalUsd.diferenciaBenchmark)}`);
+    }
+    if (posicionesUsdAbiertas.length > 0) {
+      for (const p of posicionesUsdAbiertas.sort((a, b) => b.gananciaCedear - a.gananciaCedear)) {
+        const pct = p.capitalInvertido ? (p.gananciaCedear / p.capitalInvertido) * 100 : 0;
+        lineas.push(`${nombreTicker(p.ticker)}: ${signo(p.gananciaCedear)}${formatUSD(p.gananciaCedear)} (${signo(pct)}${pct.toFixed(1)}%) — ${traducirRecomendacion(idioma, p.recomendacion)}`);
+      }
+    }
+  }
+
+  // Cripto (dólares): tercer bloque aparte, ni con los pesos ni con las
+  // acciones — cada tipo de activo con su propio total, sin mezclar.
+  const totalCrypto = snapshot?.cartera?.totalCrypto;
+  const posicionesCryptoAbiertas = posiciones.filter((p) => p.posicionAbierta && p.tipo === 'CRYPTO');
+  if (totalCrypto && totalCrypto.capitalInvertido > 0) {
+    const gananciaPctCrypto = totalCrypto.capitalInvertido ? (totalCrypto.gananciaCedear / totalCrypto.capitalInvertido) * 100 : 0;
+    lineas.push('');
+    lineas.push(t(idioma, 'resumen.tituloCripto'));
+    lineas.push(`💰 ${t(idioma, 'resumen.invertido')}: ${formatUSD(totalCrypto.capitalInvertido)}`);
+    lineas.push(`📈 ${t(idioma, 'resumen.valorHoy')}: ${formatUSD(totalCrypto.valorHoyTotal)}`);
+    lineas.push(`${totalCrypto.gananciaCedear >= 0 ? '✅' : '🔻'} ${t(idioma, 'resumen.ganancia')}: ${formatUSD(totalCrypto.gananciaCedear)} (${signo(gananciaPctCrypto)}${gananciaPctCrypto.toFixed(1)}%)`);
+    if (totalCrypto.diferenciaBenchmark != null) {
+      lineas.push(`${t(idioma, 'resumen.vsBtc')}: ${signo(totalCrypto.diferenciaBenchmark)}${formatUSD(totalCrypto.diferenciaBenchmark)}`);
+    }
+    if (posicionesCryptoAbiertas.length > 0) {
+      for (const p of posicionesCryptoAbiertas.sort((a, b) => b.gananciaCedear - a.gananciaCedear)) {
+        const pct = p.capitalInvertido ? (p.gananciaCedear / p.capitalInvertido) * 100 : 0;
+        lineas.push(`${nombreTicker(p.ticker)}: ${signo(p.gananciaCedear)}${formatUSD(p.gananciaCedear)} (${signo(pct)}${pct.toFixed(1)}%) — ${traducirRecomendacion(idioma, p.recomendacion)}`);
+      }
+    }
   }
 
   const agresivo = (snapshot.oportunidades?.AGRESIVO || []).slice(0, 5).map((x) => x.ticker);

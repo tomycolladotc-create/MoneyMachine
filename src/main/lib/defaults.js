@@ -3,6 +3,7 @@ const CONFIG_DEFAULT = {
   STOP_LOSS_PCT: -15.0,
   TAKE_PROFIT_PCT: 30.0,
   TASA_PF_ANUAL: 0.225,
+  TASA_PF_ANUAL_FECHA: null, // fecha del último dato traído del BCRA; no editable a mano
   TASA_PF_UVA_PLUS_ANUAL: 0.01,
   COMISION_PCT: 0.005,
   MIN_ANALISTAS_RANKING: 8,
@@ -33,6 +34,6 @@ const { TICKER_SECTOR } = require('./universe');
 // Punto de partida para el universo editable: se usa una sola vez, la primera
 // vez que arranca la app, para sembrar universo.json. De ahí en adelante el
 // usuario lo edita desde la UI y este archivo ya no se vuelve a tocar.
-const UNIVERSO_DEFAULT = Object.entries(TICKER_SECTOR).map(([ticker, sector]) => ({ ticker, sector }));
+const UNIVERSO_DEFAULT = Object.entries(TICKER_SECTOR).map(([ticker, sector]) => ({ ticker, sector, tipo: 'CEDEAR' }));
 
 module.exports = { CONFIG_DEFAULT, CARTERA_DEFAULT, UNIVERSO_DEFAULT };

@@ -2,6 +2,8 @@
 // Todas las funciones son puras: reciben datos ya resueltos (precios, fechas)
 // y devuelven números, sin tocar red ni disco.
 
+const { tipoDeTicker } = require('./tipos');
+
 const MS_DIA = 86400000;
 
 function diasEntre(fechaIni, fechaFin) {
@@ -50,12 +52,21 @@ function buscarPrecioEnFecha(bars, fecha) {
   return mejor;
 }
 
-// movimientos: [{ fecha, tipo: 'compra'|'venta', monto_ars, precio }]
-// precioActualARS: precio de mercado hoy, en pesos
+// movimientos: [{ fecha, tipo: 'compra'|'venta', monto, precio }]
+// `monto`/`precio` están en la moneda que le corresponde al ticker: pesos para
+// un CEDEAR (ticker termina en ".BA"), o dólares para una acción de Wall
+// Street o una criptomoneda (ver tipos.js) — se define así en vez de cargarlo
+// aparte porque ya es justamente lo que distingue a un tipo del otro en toda
+// la app.
+// precioActual: precio de mercado hoy, en esa misma moneda.
 // fechaHoy: 'YYYY-MM-DD'
-// benchmark (opcional): { precioEnFecha: (fecha) => precioARS|null, precioHoy: number }
-// para comparar contra haber puesto la misma plata en otra cosa (ej. CEDEAR del S&P 500).
-function calcularPosicion(ticker, movimientos, precioActualARS, fechaHoy, config, benchmark) {
+// benchmark (opcional): { precioEnFecha: (fecha) => precio|null, precioHoy: number },
+// en la misma moneda que la posición (CEDEAR del S&P 500 en pesos, el ETF SPY
+// en dólares, o Bitcoin para cripto), para comparar contra haber puesto la
+// misma plata ahí.
+function calcularPosicion(ticker, movimientos, precioActual, fechaHoy, config, benchmark) {
+  const tipo = tipoDeTicker(ticker);
+  const esAccion = tipo !== 'CEDEAR'; // no-CEDEAR: sin plazo fijo/UVA, valores en dólares
   const compras = movimientos.filter((m) => m.tipo === 'compra');
   const ventas = movimientos.filter((m) => m.tipo === 'venta');
 
@@ -65,51 +76,57 @@ function calcularPosicion(ticker, movimientos, precioActualARS, fechaHoy, config
   let montoCompradoNeto = 0;
   let capitalInvertido = 0; // bruto: incluye la comisión de compra
   for (const c of compras) {
-    cantidadComprada += c.monto_ars / c.precio;
-    montoCompradoNeto += c.monto_ars;
-    capitalInvertido += c.monto_ars / (1 - comision);
+    cantidadComprada += c.monto / c.precio;
+    montoCompradoNeto += c.monto;
+    capitalInvertido += c.monto / (1 - comision);
   }
   const costoPromedio = cantidadComprada > 0 ? montoCompradoNeto / cantidadComprada : null;
 
   let cantidadVendida = 0;
   let recuperado = 0;
   for (const v of ventas) {
-    cantidadVendida += v.monto_ars / v.precio;
-    recuperado += v.monto_ars;
+    cantidadVendida += v.monto / v.precio;
+    recuperado += v.monto;
   }
 
   const cantidadNeta = cantidadComprada - cantidadVendida;
   const posicionAbierta = cantidadNeta > 1e-9;
-  const valorActual = posicionAbierta ? cantidadNeta * precioActualARS * (1 - comision) : 0;
+  const valorActual = posicionAbierta ? cantidadNeta * precioActual * (1 - comision) : 0;
   const valorHoyTotal = recuperado + valorActual;
   const gananciaCedear = valorHoyTotal - capitalInvertido;
 
-  // Plazo fijo tradicional: cada compra (monto bruto) crece a interés compuesto
-  // diario desde su fecha hasta hoy.
-  let valorPF = 0;
-  let valorPFUva = 0;
-  for (const c of compras) {
-    const montoGross = c.monto_ars / (1 - comision);
-    const dias = diasEntre(c.fecha, fechaHoy);
-    valorPF += montoGross * factorTasaDiaria(config.TASA_PF_ANUAL, dias);
+  // Plazo fijo tradicional y UVA: solo tienen sentido en pesos (son tasas e
+  // inflación de Argentina) — para una acción en dólares no hay con qué
+  // compararlas, así que se dejan en null en vez de mezclar monedas.
+  let valorPF = null;
+  let valorPFUva = null;
+  if (!esAccion) {
+    valorPF = 0;
+    valorPFUva = 0;
+    for (const c of compras) {
+      const montoGross = c.monto / (1 - comision);
+      const dias = diasEntre(c.fecha, fechaHoy);
+      valorPF += montoGross * factorTasaDiaria(config.TASA_PF_ANUAL, dias);
 
-    const factorInfl = factorInflacionAcumulada(
-      c.fecha, fechaHoy, config.INFLACION_MENSUAL, config.INFLACION_MENSUAL_ESTIMADA_DEFAULT,
-    );
-    const factorPlus = factorTasaDiaria(config.TASA_PF_UVA_PLUS_ANUAL, dias);
-    valorPFUva += montoGross * factorInfl * factorPlus;
+      const factorInfl = factorInflacionAcumulada(
+        c.fecha, fechaHoy, config.INFLACION_MENSUAL, config.INFLACION_MENSUAL_ESTIMADA_DEFAULT,
+      );
+      const factorPlus = factorTasaDiaria(config.TASA_PF_UVA_PLUS_ANUAL, dias);
+      valorPFUva += montoGross * factorInfl * factorPlus;
+    }
   }
-  const gananciaPF = valorPF - capitalInvertido;
-  const gananciaPFUva = valorPFUva - capitalInvertido;
+  const gananciaPF = valorPF != null ? valorPF - capitalInvertido : null;
+  const gananciaPFUva = valorPFUva != null ? valorPFUva - capitalInvertido : null;
 
-  // Benchmark (ej. S&P 500 vía CEDEAR): cada compra, en vez de crecer a una tasa
-  // fija, crece según cuánto subió/bajó realmente el benchmark entre esa fecha y hoy.
+  // Benchmark (CEDEAR del S&P 500 en pesos, o el ETF SPY en dólares según la
+  // moneda de la posición): cada compra, en vez de crecer a una tasa fija,
+  // crece según cuánto subió/bajó realmente el benchmark entre esa fecha y hoy.
   let valorBenchmark = null;
   let compradoSinDatoBenchmark = false;
   if (benchmark) {
     valorBenchmark = 0;
     for (const c of compras) {
-      const montoGross = c.monto_ars / (1 - comision);
+      const montoGross = c.monto / (1 - comision);
       const precioEnCompra = benchmark.precioEnFecha(c.fecha);
       if (precioEnCompra == null || benchmark.precioHoy == null) {
         compradoSinDatoBenchmark = true;
@@ -123,6 +140,8 @@ function calcularPosicion(ticker, movimientos, precioActualARS, fechaHoy, config
 
   return {
     ticker,
+    tipo,
+    esAccion,
     posicionAbierta,
     cantidadNeta,
     costoPromedio,
@@ -133,10 +152,10 @@ function calcularPosicion(ticker, movimientos, precioActualARS, fechaHoy, config
     gananciaCedear,
     valorPF,
     gananciaPF,
-    diferenciaPF: gananciaCedear - gananciaPF,
+    diferenciaPF: gananciaPF != null ? gananciaCedear - gananciaPF : null,
     valorPFUva,
     gananciaPFUva,
-    diferenciaPFUva: gananciaCedear - gananciaPFUva,
+    diferenciaPFUva: gananciaPFUva != null ? gananciaCedear - gananciaPFUva : null,
     valorBenchmark,
     gananciaBenchmark,
     diferenciaBenchmark: gananciaBenchmark != null ? gananciaCedear - gananciaBenchmark : null,
@@ -145,9 +164,9 @@ function calcularPosicion(ticker, movimientos, precioActualARS, fechaHoy, config
 }
 
 // Código estable (no texto): ver comentario sobre señalDeTiming en scoring.js.
-function calcularRecomendacion(posicion, precioActualARS, potencialPct, config) {
+function calcularRecomendacion(posicion, precioActual, potencialPct, config) {
   if (!posicion.posicionAbierta || posicion.costoPromedio == null) return 'CLOSED';
-  const varPct = ((precioActualARS - posicion.costoPromedio) / posicion.costoPromedio) * 100;
+  const varPct = ((precioActual - posicion.costoPromedio) / posicion.costoPromedio) * 100;
   if (varPct <= config.STOP_LOSS_PCT) return 'STOP_LOSS';
   if (varPct >= config.TAKE_PROFIT_PCT) {
     if (potencialPct != null && potencialPct > 15) return 'TAKE_PROFIT_HOLD';
